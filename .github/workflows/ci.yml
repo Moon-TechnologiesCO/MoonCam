@@ -34,7 +34,7 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
       - name: Protocol tests (shared vectors)
         working-directory: android
         run: ./gradlew :protocol:test --console=plain
