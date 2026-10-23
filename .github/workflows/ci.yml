@@ -17,7 +17,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: FFmpeg (decoder libraries and the test-video generator)
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           global-json-file: desktop/global.json
       - name: Build
@@ -48,7 +48,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           global-json-file: desktop/global.json
       - name: Build the Debian package
