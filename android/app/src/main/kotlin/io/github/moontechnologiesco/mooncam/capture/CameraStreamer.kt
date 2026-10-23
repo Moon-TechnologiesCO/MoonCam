@@ -2,6 +2,7 @@ package io.github.moontechnologiesco.mooncam.capture
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.hardware.camera2.CameraAccessException
 import android.hardware.camera2.CameraCaptureSession
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraDevice
@@ -65,10 +66,17 @@ class CameraStreamer(
     private var current: StreamRequest? = null
     @Volatile private var waitingForKeyFrame = true
 
+    // Every start/stop begins a new generation. Camera2 delivers callbacks asynchronously, so a callback from
+    // an older generation (e.g. "session configured" after we already switched cameras) must be ignored.
+    private var generation = 0
+
+    // True only when another app took the camera from us; our own close() must not trigger a reopen.
+    private var cameraTaken = false
+
     private val availability = object : CameraManager.AvailabilityCallback() {
         override fun onCameraAvailable(cameraId: String) {
             val request = current ?: return
-            if (camera == null && catalog.resolve(request.cameraId)?.first == cameraId) {
+            if (cameraTaken && catalog.resolve(request.cameraId)?.first == cameraId) {
                 listener.onCameraResumed()
                 start(request)
             }
@@ -80,15 +88,19 @@ class CameraStreamer(
     }
 
     fun start(request: StreamRequest) = handler.post {
+        if (request == current && camera != null) return@post // already streaming exactly this
         closeCapture()
+        val gen = ++generation
         current = request
+        cameraTaken = false
         val (logicalId, physicalId) = catalog.resolve(request.cameraId) ?: return@post
         val size = closestSize(catalog.characteristics(physicalId ?: logicalId), request)
         startEncoder(size, request)
-        openCamera(logicalId, physicalId, request.fps)
+        openCamera(gen, logicalId, physicalId, request.fps)
     }
 
     fun stop() = handler.post {
+        generation++
         current = null
         closeCapture()
     }
@@ -127,43 +139,74 @@ class CameraStreamer(
     }
 
     @SuppressLint("MissingPermission") // the activity obtains CAMERA before starting the service
-    private fun openCamera(logicalId: String, physicalId: String?, fps: Int) {
-        cameraManager.openCamera(logicalId, object : CameraDevice.StateCallback() {
+    private fun openCamera(gen: Int, logicalId: String, physicalId: String?, fps: Int) {
+        val callback = object : CameraDevice.StateCallback() {
             override fun onOpened(device: CameraDevice) {
+                if (gen != generation) {
+                    device.close() // we already moved on to another camera
+                    return
+                }
                 camera = device
-                createSession(device, physicalId, fps)
+                createSession(gen, device, physicalId, fps)
             }
 
-            override fun onDisconnected(device: CameraDevice) = cameraLost(device)
+            override fun onDisconnected(device: CameraDevice) = cameraLost(gen, device)
 
-            override fun onError(device: CameraDevice, error: Int) = cameraLost(device)
-        }, handler)
+            override fun onError(device: CameraDevice, error: Int) = cameraLost(gen, device)
+        }
+        try {
+            cameraManager.openCamera(logicalId, callback, handler)
+        } catch (e: CameraAccessException) {
+            markTaken()
+        }
     }
 
-    /** Another app took the camera (it has priority while visible). We reopen when it is free again. */
-    private fun cameraLost(device: CameraDevice) {
+    /** The camera stopped working for us. If it is the current one, another app took it: wait until it is free. */
+    private fun cameraLost(gen: Int, device: CameraDevice) {
         device.close()
+        if (gen != generation) return
         camera = null
+        markTaken()
+    }
+
+    private fun markTaken() {
+        cameraTaken = true
         listener.onCameraBusy()
     }
 
-    private fun createSession(device: CameraDevice, physicalId: String?, fps: Int) {
+    private fun createSession(gen: Int, device: CameraDevice, physicalId: String?, fps: Int) {
         val surface = inputSurface ?: return
         val output = OutputConfiguration(surface).apply { physicalId?.let(::setPhysicalCameraId) }
         val config = SessionConfiguration(SessionConfiguration.SESSION_REGULAR, listOf(output), executor,
             object : CameraCaptureSession.StateCallback() {
                 override fun onConfigured(captureSession: CameraCaptureSession) {
-                    session = captureSession
-                    val request = device.createCaptureRequest(CameraDevice.TEMPLATE_RECORD).apply {
-                        addTarget(surface)
-                        bestFpsRange(device.id, fps)?.let { set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, it) }
+                    if (gen != generation || camera !== device) {
+                        captureSession.close() // stale: the camera was switched or closed meanwhile
+                        return
                     }
-                    captureSession.setRepeatingRequest(request.build(), null, handler)
+                    session = captureSession
+                    try {
+                        val request = device.createCaptureRequest(CameraDevice.TEMPLATE_RECORD).apply {
+                            addTarget(surface)
+                            bestFpsRange(device.id, fps)?.let { set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, it) }
+                        }
+                        captureSession.setRepeatingRequest(request.build(), null, handler)
+                    } catch (e: IllegalStateException) {
+                        cameraLost(gen, device)
+                    } catch (e: CameraAccessException) {
+                        cameraLost(gen, device)
+                    }
                 }
 
-                override fun onConfigureFailed(captureSession: CameraCaptureSession) = cameraLost(device)
+                override fun onConfigureFailed(captureSession: CameraCaptureSession) = cameraLost(gen, device)
             })
-        device.createCaptureSession(config)
+        try {
+            device.createCaptureSession(config)
+        } catch (e: IllegalStateException) {
+            cameraLost(gen, device)
+        } catch (e: CameraAccessException) {
+            cameraLost(gen, device)
+        }
     }
 
     private fun bestFpsRange(cameraId: String, fps: Int): Range<Int>? =
