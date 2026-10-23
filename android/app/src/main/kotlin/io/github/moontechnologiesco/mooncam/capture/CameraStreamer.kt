@@ -12,6 +12,7 @@ import android.hardware.camera2.params.OutputConfiguration
 import android.hardware.camera2.params.SessionConfiguration
 import android.media.MediaCodec
 import android.media.MediaCodecInfo
+import android.media.MediaCodecList
 import android.media.MediaFormat
 import android.os.Bundle
 import android.os.Handler
@@ -95,8 +96,12 @@ class CameraStreamer(
         cameraTaken = false
         val (logicalId, physicalId) = catalog.resolve(request.cameraId) ?: return@post
         val size = closestSize(catalog.characteristics(physicalId ?: logicalId), request)
-        startEncoder(size, request)
-        openCamera(gen, logicalId, physicalId, request.fps)
+        val supported = supportedByEncoder(size, request)
+        if (!startEncoder(size, supported)) {
+            markTaken() // the encoder is unavailable (another app may hold it); retried on the next start
+            return@post
+        }
+        openCamera(gen, logicalId, physicalId, supported.fps)
     }
 
     fun stop() = handler.post {
@@ -117,7 +122,35 @@ class CameraStreamer(
         }
     }
 
-    private fun startEncoder(size: Size, request: StreamRequest) {
+    /**
+     * Phones advertise what their encoder can do. Asking for more (e.g. 1080p at 60 fps with a very high bitrate
+     * on a mid-range chip) makes configure() fail, so the request is clamped to the nearest supported values.
+     */
+    private fun supportedByEncoder(size: Size, request: StreamRequest): StreamRequest {
+        val capabilities = MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos
+            .firstOrNull { it.isEncoder && MediaFormat.MIMETYPE_VIDEO_AVC in it.supportedTypes }
+            ?.getCapabilitiesForType(MediaFormat.MIMETYPE_VIDEO_AVC)?.videoCapabilities ?: return request
+        val fps = listOf(request.fps, 30, 24).firstOrNull { capabilities.areSizeAndRateSupported(size.width, size.height, it.toDouble()) }
+            ?: request.fps
+        val bitrate = request.bitrateBps.coerceIn(capabilities.bitrateRange.lower, capabilities.bitrateRange.upper)
+        return request.copy(fps = fps, bitrateBps = bitrate)
+    }
+
+    /** Returns false when the encoder cannot be created or configured; the streamer then reports "busy". */
+    private fun startEncoder(size: Size, request: StreamRequest): Boolean = try {
+        configureEncoder(size, request)
+        true
+    } catch (e: MediaCodec.CodecException) {
+        false
+    } catch (e: IllegalArgumentException) {
+        false
+    } catch (e: IllegalStateException) {
+        false
+    } catch (e: IOException) {
+        false
+    }
+
+    private fun configureEncoder(size: Size, request: StreamRequest) {
         val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, size.width, size.height).apply {
             setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
             setInteger(MediaFormat.KEY_BIT_RATE, request.bitrateBps)
@@ -129,10 +162,17 @@ class CameraStreamer(
             setLong(MediaFormat.KEY_REPEAT_PREVIOUS_FRAME_AFTER, 100_000L) // keep frames flowing on still scenes
         }
         val codec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
-        codec.setCallback(EncoderCallback(size, request.fps), handler)
-        codec.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
-        inputSurface = codec.createInputSurface()
-        codec.start()
+        try {
+            codec.setCallback(EncoderCallback(size, request.fps), handler)
+            codec.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+            inputSurface = codec.createInputSurface()
+            codec.start()
+        } catch (e: RuntimeException) {
+            codec.release() // never leak a hardware encoder
+            inputSurface?.release()
+            inputSurface = null
+            throw e
+        }
         encoder = codec
         waitingForKeyFrame = true
         startSender()
