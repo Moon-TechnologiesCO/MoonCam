@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MoonCam</string>
+    <string name="tagline">Your phone, as your computer\'s webcam</string>
+    <string name="state_idle">Not connected</string>
+    <string name="state_connecting">Connecting to your computer…</string>
+    <string name="state_connected">Connected to %1$s</string>
+    <string name="state_streaming">Streaming to %1$s</string>
+    <string name="state_reconnecting">Connection lost. Reconnecting…</string>
+    <string name="state_camera_busy">Another app is using the camera. MoonCam will resume when it is free.</string>
+    <string name="state_rejected">Your computer refused the connection: %1$s</string>
+    <string name="how_to_title">Connect with a USB cable</string>
+    <string name="how_to_body">1. Turn on USB debugging in Developer options.\n2. Plug the phone into your computer.\n3. In MoonCam on the computer, press “Connect via USB”.</string>
+    <string name="stop">Stop</string>
+    <string name="consent_title">Use the camera on your computer?</string>
+    <string name="consent_body">Your computer asked to connect over USB. MoonCam will stream this phone\'s camera to it until you press Stop. Allow only if you just pressed “Connect via USB” on your computer.</string>
+    <string name="consent_allow">Allow</string>
+    <string name="consent_deny">Don\'t allow</string>
+    <string name="permission_needed">MoonCam needs camera access to work as your webcam.</string>
+    <string name="grant_permission">Allow camera</string>
+    <string name="notification_channel">Streaming</string>
+    <string name="notification_title">MoonCam is using your camera</string>
+    <string name="notification_text">Streaming to your computer. Tap Stop to end.</string>
+    <string name="privacy_note">Local only · no cloud · no account</string>
+</resources>

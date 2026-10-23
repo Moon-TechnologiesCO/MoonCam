@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=MoonCam
+GenericName=Phone Webcam
+Comment=Use your Android phone as a webcam
+Comment[es]=Usa tu teléfono Android como cámara web
+Exec=mooncam
+Icon=mooncam
+Terminal=false
+Categories=AudioVideo;Video;
+Keywords=webcam;camera;phone;android;
+StartupWMClass=mooncam

@@ -1,0 +1,8 @@
+#!/bin/sh
+set -e
+case "$1" in
+    purge)
+        rm -f /etc/modprobe.d/mooncam.conf /etc/modules-load.d/mooncam.conf
+        ;;
+esac
+exit 0

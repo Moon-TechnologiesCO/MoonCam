@@ -1,0 +1,83 @@
+{
+  "description": "MoonLink v1 test vectors. Both the Kotlin and the C# implementations must decode every 'valid' frame to the listed fields and re-encode it to exactly the same bytes, and must reject every 'invalid' frame.",
+  "preamble": {
+    "hex": "4d4f4f4e4c494e4b0001",
+    "version": 1
+  },
+  "valid": [
+    {
+      "name": "ping",
+      "hex": "300000000000000800000000000f4240000000000000002a",
+      "type": 48,
+      "flags": 0,
+      "timestampUs": 1000000,
+      "payloadHex": "000000000000002a"
+    },
+    {
+      "name": "video key frame",
+      "hex": "1101000000000005000000000000823500000001 65",
+      "type": 17,
+      "flags": 1,
+      "timestampUs": 33333,
+      "payloadHex": "0000000165"
+    },
+    {
+      "name": "empty control payload with end of stream",
+      "hex": "04020000000000000000000000000000",
+      "type": 4,
+      "flags": 2,
+      "timestampUs": 0,
+      "payloadHex": ""
+    },
+    {
+      "name": "video config 1280x720 at 30 fps, H.264",
+      "hex": "10000000000000140000000000000000 01 0500 02d0 1e 0000000167 42001f 00000001 68ce",
+      "type": 16,
+      "flags": 0,
+      "timestampUs": 0,
+      "payloadHex": "01050002d01e000000016742001f0000000168ce",
+      "videoConfig": { "codec": 1, "width": 1280, "height": 720, "fps": 30, "codecDataHex": "000000016742001f0000000168ce" }
+    },
+    {
+      "name": "audio config Opus 48 kHz mono",
+      "hex": "20000000000000060000000000000000 01 0000bb80 01",
+      "type": 32,
+      "flags": 0,
+      "timestampUs": 0,
+      "payloadHex": "010000bb8001",
+      "audioConfig": { "codec": 1, "sampleRate": 48000, "channels": 1, "codecDataHex": "" }
+    },
+    {
+      "name": "negative timestamp is allowed (signed)",
+      "hex": "3100000000000008ffffffffffffffff 0000000000000001",
+      "type": 49,
+      "flags": 0,
+      "timestampUs": -1,
+      "payloadHex": "0000000000000001"
+    }
+  ],
+  "json": [
+    {
+      "name": "hello",
+      "type": 1,
+      "payload": { "deviceName": "Pixel 9", "manufacturer": "Google", "model": "Pixel 9", "androidVersion": "16", "appVersion": "0.1.0", "token": "abc123" }
+    },
+    {
+      "name": "welcome accepted",
+      "type": 2,
+      "payload": { "accepted": true, "sessionId": "s-1", "serverName": "Lenovo-V14" }
+    },
+    {
+      "name": "start command",
+      "type": 4,
+      "payload": { "op": "start", "camera": "0", "width": 1280, "height": 720, "fps": 30, "bitrateBps": 2800000, "codec": "h264" }
+    }
+  ],
+  "invalid": [
+    { "name": "unknown type", "hex": "7f000000000000000000000000000000", "reason": "unknown frame type" },
+    { "name": "unknown flag", "hex": "11800000000000000000000000000000", "reason": "unknown flags" },
+    { "name": "reserved bits set", "hex": "11000001000000000000000000000000", "reason": "reserved must be zero" },
+    { "name": "payload too large", "hex": "11000000010000010000000000000000", "reason": "length above 16 MiB" },
+    { "name": "truncated header", "hex": "1100000000", "reason": "header shorter than 16 bytes" }
+  ]
+}

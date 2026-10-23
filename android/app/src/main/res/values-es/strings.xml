@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tagline">Tu teléfono, como la cámara web de tu computador</string>
+    <string name="state_idle">Sin conexión</string>
+    <string name="state_connecting">Conectando con tu computador…</string>
+    <string name="state_connected">Conectado a %1$s</string>
+    <string name="state_streaming">Transmitiendo a %1$s</string>
+    <string name="state_reconnecting">Se perdió la conexión. Reconectando…</string>
+    <string name="state_camera_busy">Otra app está usando la cámara. MoonCam seguirá cuando se libere.</string>
+    <string name="state_rejected">Tu computador rechazó la conexión: %1$s</string>
+    <string name="how_to_title">Conecta con un cable USB</string>
+    <string name="how_to_body">1. Activa la depuración USB en Opciones de desarrollador.\n2. Conecta el teléfono a tu computador.\n3. En MoonCam del computador, pulsa “Connect via USB”.</string>
+    <string name="stop">Detener</string>
+    <string name="consent_title">¿Usar la cámara en tu computador?</string>
+    <string name="consent_body">Tu computador pidió conectarse por USB. MoonCam transmitirá la cámara de este teléfono hasta que pulses Detener. Permítelo solo si acabas de pulsar “Connect via USB” en tu computador.</string>
+    <string name="consent_allow">Permitir</string>
+    <string name="consent_deny">No permitir</string>
+    <string name="permission_needed">MoonCam necesita acceso a la cámara para funcionar como tu cámara web.</string>
+    <string name="grant_permission">Permitir cámara</string>
+    <string name="notification_channel">Transmisión</string>
+    <string name="notification_title">MoonCam está usando tu cámara</string>
+    <string name="notification_text">Transmitiendo a tu computador. Toca Detener para terminar.</string>
+    <string name="privacy_note">Solo local · sin nube · sin cuenta</string>
+</resources>

@@ -1,0 +1,59 @@
+# Builds and tests the desktop app, the Android protocol and the Android app on every change.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  desktop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: FFmpeg (decoder libraries and the test-video generator)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: desktop/global.json
+      - name: Build
+        run: dotnet build desktop/MoonCam.slnx --configuration Release
+      - name: Test
+        run: dotnet test desktop/MoonCam.slnx --configuration Release --no-build --blame-hang-timeout 2m
+
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Protocol tests (shared vectors)
+        working-directory: android
+        run: ./gradlew :protocol:test --console=plain
+      - name: Build the app
+        working-directory: android
+        run: ./gradlew :app:assembleDebug --console=plain
+
+  package:
+    runs-on: ubuntu-latest
+    needs: desktop
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: desktop/global.json
+      - name: Build the Debian package
+        run: packaging/linux/build-deb.sh 0.1.0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mooncam-deb
+          path: dist/*.deb

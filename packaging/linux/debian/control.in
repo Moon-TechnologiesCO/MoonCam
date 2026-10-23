@@ -1,0 +1,16 @@
+Package: mooncam
+Version: @VERSION@
+Section: video
+Priority: optional
+Architecture: amd64
+Installed-Size: @SIZE@
+Depends: dotnet-runtime-10.0, libavcodec62 | libavcodec61 | libavcodec60,
+ linux-modules-v4l2loopback-generic-hwe-26.04 | linux-modules-v4l2loopback-generic | linux-modules-v4l2loopback-oem-26.04,
+ adb, pkexec, kmod
+Conflicts: v4l2loopback-dkms (>= 0~)
+Maintainer: Moon Technologies <https://github.com/Moon-TechnologiesCO>
+Homepage: https://github.com/Moon-TechnologiesCO/MoonCam
+Description: Use your Android phone as a webcam for Linux
+ MoonCam turns an Android phone into a webcam for this computer, over USB or
+ Wi-Fi. The video appears as a real camera ("MoonCam") in OBS Studio, Discord,
+ Zoom, Google Meet and browsers. Local only: no cloud, no account, no telemetry.

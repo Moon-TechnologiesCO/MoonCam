@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# MoonCam system setup — installs and configures everything MoonCam needs on Ubuntu.
+# The .deb package normally does all of this at install time; MoonCam only runs this helper (through pkexec,
+# with the standard system password dialog) to repair a broken setup. Idempotent.
+set -euo pipefail
+
+if [[ ${EUID} -ne 0 ]]; then
+  echo "mooncam-setup must run as root (MoonCam starts it through pkexec)." >&2
+  exit 1
+fi
+
+export DEBIAN_FRONTEND=noninteractive
+packages=()
+installable() { [[ -n "$(apt-cache policy "$1" 2>/dev/null | awk '/Candidate:/ {print $2}' | grep -v '(none)')" ]]; }
+
+command -v adb >/dev/null 2>&1 || packages+=(adb)
+ldconfig -p | grep -q 'libavcodec\.so\.' || packages+=(ffmpeg)
+
+# Virtual camera driver. Prefer Ubuntu's prebuilt module, signed by Canonical: it loads with Secure Boot on,
+# with no key enrollment and no reboot. The metapackage follows the installed kernel flavour (e.g.
+# generic-hwe-26.04), so the driver keeps working after kernel updates.
+flavour="$(dpkg-query -W -f='${db:Status-Abbrev}${Package}\n' 'linux-image-generic*' 'linux-image-oem*' 'linux-image-lowlatency*' 2>/dev/null \
+  | awk '/^ii/ {print $2}' | head -n1 | sed 's/^linux-image-//')"
+signed_meta="linux-modules-v4l2loopback-${flavour:-generic}"
+signed_running="linux-main-modules-v4l2loopback-$(uname -r)"
+use_signed=false
+if installable "$signed_meta" && installable "$signed_running"; then
+  use_signed=true
+  dpkg -s "$signed_meta" >/dev/null 2>&1 || packages+=("$signed_meta")
+  dpkg -s "$signed_running" >/dev/null 2>&1 || packages+=("$signed_running")
+else
+  echo "UNSUPPORTED_KERNEL: no signed v4l2loopback module for kernel $(uname -r)."
+  exit 4
+fi
+
+if ((${#packages[@]} > 0)); then
+  echo "Installing: ${packages[*]}"
+  apt-get update -qq
+  apt-get install -y -qq "${packages[@]}"
+fi
+
+# A locally built (DKMS) copy would shadow the signed module; remove it when the signed one is available.
+if $use_signed && dpkg -s v4l2loopback-dkms >/dev/null 2>&1; then
+  apt-get purge -y -qq v4l2loopback-dkms
+  depmod -a
+fi
+
+# One device labelled "MoonCam", visible to Chrome/Electron apps (exclusive_caps=1), loaded at every boot.
+cat > /etc/modprobe.d/mooncam.conf <<'EOF'
+options v4l2loopback devices=1 video_nr=10 card_label="MoonCam" exclusive_caps=1
+EOF
+echo v4l2loopback > /etc/modules-load.d/mooncam.conf
+
+if lsmod | grep -q '^v4l2loopback'; then
+  modprobe -r v4l2loopback 2>/dev/null || true # reload with MoonCam's options when no app is using it
+fi
+if ! lsmod | grep -q '^v4l2loopback' && ! modprobe v4l2loopback 2>/tmp/mooncam-modprobe.err; then
+  if grep -qi 'key was rejected\|required key not available' /tmp/mooncam-modprobe.err; then
+    echo "SECURE_BOOT_ENROLLMENT_REQUIRED"
+    exit 3
+  fi
+  cat /tmp/mooncam-modprobe.err >&2
+  exit 2
+fi
+
+echo "MoonCam is ready."

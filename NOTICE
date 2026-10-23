@@ -1,0 +1,11 @@
+MoonCam
+Copyright 2026 Moon Technologies
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+"MoonCam", "Moon Technologies", the MoonCam icon and the cradle-moon logo are trademarks of Moon Technologies.
+The Apache License does not grant permission to use them (section 6). Forks must use a different name and icon.
+
+The desktop app embeds the Moon Sans and Moon Mono fonts, licensed under the SIL Open Font License 1.1.
+It uses FFmpeg (LGPL/GPL, dynamically linked), Avalonia (MIT), CommunityToolkit.Mvvm (MIT) and .NET (MIT).
+The Android app uses AndroidX and Jetpack Compose (Apache-2.0) and kotlinx libraries (Apache-2.0).

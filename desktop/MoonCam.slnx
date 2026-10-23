@@ -1,0 +1,15 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/MoonCam.App/MoonCam.App.csproj" />
+    <Project Path="src/MoonCam.Core/MoonCam.Core.csproj" />
+    <Project Path="src/MoonCam.Infrastructure/MoonCam.Infrastructure.csproj" />
+    <Project Path="src/MoonCam.Platform.Linux/MoonCam.Platform.Linux.csproj" />
+    <Project Path="src/MoonCam.Tools.FakePhone/MoonCam.Tools.FakePhone.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/MoonCam.App.Tests/MoonCam.App.Tests.csproj" />
+    <Project Path="tests/MoonCam.Core.Tests/MoonCam.Core.Tests.csproj" />
+    <Project Path="tests/MoonCam.Infrastructure.Tests/MoonCam.Infrastructure.Tests.csproj" />
+    <Project Path="tests/MoonCam.Platform.Linux.Tests/MoonCam.Platform.Linux.Tests.csproj" />
+  </Folder>
+</Solution>

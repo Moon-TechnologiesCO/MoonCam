@@ -1,0 +1,26 @@
+#!/bin/sh
+# Configures the virtual camera so MoonCam works the first time it is opened.
+set -e
+
+configure_virtual_camera() {
+    printf 'options v4l2loopback devices=1 video_nr=10 card_label="MoonCam" exclusive_caps=1\n' > /etc/modprobe.d/mooncam.conf
+    echo v4l2loopback > /etc/modules-load.d/mooncam.conf
+
+    # Reload the module with MoonCam's options unless an app is using a loopback camera right now.
+    if lsmod | grep -q '^v4l2loopback'; then
+        modprobe -r v4l2loopback 2>/dev/null || return 0
+    fi
+    if ! modprobe v4l2loopback 2>/dev/null; then
+        echo "MoonCam: the virtual camera will be ready after the next restart." >&2
+        echo "MoonCam: if Secure Boot asks to enroll a key (MOK), choose 'Enroll MOK' and enter the password you set." >&2
+    fi
+}
+
+case "$1" in
+    configure)
+        configure_virtual_camera
+        if command -v update-desktop-database >/dev/null 2>&1; then update-desktop-database -q /usr/share/applications || true; fi
+        if command -v gtk-update-icon-cache >/dev/null 2>&1; then gtk-update-icon-cache -q -f /usr/share/icons/hicolor || true; fi
+        ;;
+esac
+exit 0

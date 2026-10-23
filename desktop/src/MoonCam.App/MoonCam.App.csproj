@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <AssemblyName>mooncam</AssemblyName>
+    
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <AvaloniaResource Include="Assets\**" />
+    <!-- System setup helper, run through pkexec. Packages install it root-owned in /usr/libexec/mooncam. -->
+    <None Include="..\..\..\packaging\linux\mooncam-setup" Link="mooncam-setup" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.4" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MoonCam.Core\MoonCam.Core.csproj" />
+    <ProjectReference Include="..\MoonCam.Infrastructure\MoonCam.Infrastructure.csproj" />
+    <ProjectReference Include="..\MoonCam.Platform.Linux\MoonCam.Platform.Linux.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,157 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:MoonCam.App.ViewModels"
+        xmlns:setup="using:MoonCam.Core.Setup"
+        x:Class="MoonCam.App.Views.MainWindow"
+        x:DataType="vm:MainViewModel"
+        Width="1080" Height="700" MinWidth="820" MinHeight="520"
+        WindowStartupLocation="CenterScreen"
+        WindowDecorations="None"
+        Background="{StaticResource NightGradient}"
+        Foreground="{StaticResource TextBrush}"
+        Icon="avares://mooncam/Assets/mooncam.png"
+        Title="MoonCam">
+
+    <!-- macOS-style window: our own title bar with traffic lights, a floating glass sidebar and the live
+         preview. Edges stay grabbable for resizing (see MainWindow.axaml.cs). -->
+    <Grid ColumnDefinitions="300,*">
+
+        <!-- ===== Sidebar ===== -->
+        <Border Grid.Column="0" Classes="glass" Margin="10" Padding="16,14" CornerRadius="20">
+            <DockPanel>
+                <!-- Title bar: traffic lights + drag area -->
+                <Grid x:Name="TitleBar" DockPanel.Dock="Top" Height="30" Background="Transparent">
+                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <Button x:Name="CloseButton" Classes="light close" ToolTip.Tip="Close" />
+                        <Button x:Name="MinimizeButton" Classes="light minimize" ToolTip.Tip="Minimise" />
+                        <Button x:Name="ZoomButton" Classes="light zoom" ToolTip.Tip="Zoom" />
+                    </StackPanel>
+                </Grid>
+
+                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="12" Margin="0,18,0,0">
+                    <Image Source="avares://mooncam/Assets/mooncam.png" Width="44" Height="44" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="MoonCam" FontSize="20" FontWeight="SemiBold" />
+                        <TextBlock Text="by Moon Technologies" Classes="muted" FontSize="11.5" />
+                    </StackPanel>
+                </StackPanel>
+
+                <TextBlock DockPanel.Dock="Bottom" Classes="muted mono" FontSize="10.5" Opacity="0.7"
+                           Text="Local only · no cloud · no telemetry" Margin="4,12,0,0" />
+
+                <ScrollViewer>
+                    <StackPanel>
+                        <!-- Setup assistant: shown until everything MoonCam needs is installed -->
+                        <StackPanel IsVisible="{Binding !IsSetupComplete}">
+                            <TextBlock Classes="section" Text="REPAIR SETUP" />
+                            <Border Classes="glass">
+                                <StackPanel Spacing="8">
+                                    <ItemsControl ItemsSource="{Binding SetupItems}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="setup:Component">
+                                                <Grid ColumnDefinitions="18,*" Margin="0,0,0,6">
+                                                    <TextBlock Text="✓" Foreground="{StaticResource OkBrush}" IsVisible="{Binding IsReady}" />
+                                                    <TextBlock Text="•" Foreground="{StaticResource GlowBrush}" IsVisible="{Binding !IsReady}" />
+                                                    <StackPanel Grid.Column="1">
+                                                        <TextBlock Text="{Binding Name}" FontSize="12.5" FontWeight="Medium" />
+                                                        <TextBlock Text="{Binding Purpose}" Classes="muted" FontSize="11.5" TextWrapping="Wrap" />
+                                                    </StackPanel>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <Button Classes="primary" Content="Install" Command="{Binding InstallComponentsCommand}"
+                                            IsEnabled="{Binding !IsInstalling}" />
+                                    <TextBlock Classes="muted" FontSize="11" TextWrapping="Wrap"
+                                               Text="Ubuntu asks for your password in its own window. MoonCam never sees it." />
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+
+                        <TextBlock Classes="section" Text="PHONE" />
+                        <Border Classes="glass">
+                            <StackPanel Spacing="4">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Ellipse Width="9" Height="9" Fill="{StaticResource LiveBrush}" IsVisible="{Binding IsLive}" />
+                                    <Ellipse Width="9" Height="9" Fill="{StaticResource FaintBrush}" IsVisible="{Binding !IsLive}" />
+                                    <TextBlock Text="{Binding StatusTitle}" FontWeight="SemiBold" />
+                                </StackPanel>
+                                <TextBlock Text="{Binding PhoneName}" Classes="muted" FontSize="12.5" />
+                            </StackPanel>
+                        </Border>
+                        <Button Classes="primary" Margin="0,10,0,0" Content="Connect via USB" Command="{Binding ConnectUsbCommand}" />
+
+                        <TextBlock Classes="section" Text="CAMERA" />
+                        <ComboBox ItemsSource="{Binding Cameras}" SelectedItem="{Binding SelectedCamera}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:CameraOption">
+                                    <TextBlock Text="{Binding Label}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <ComboBox Margin="0,8,0,0" ItemsSource="{Binding Presets}" SelectedItem="{Binding SelectedPreset}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:PresetOption">
+                                    <TextBlock Text="{Binding Label}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <TextBlock Classes="muted" FontSize="12" Text="Quality" Margin="4,10,0,4" />
+                        <ComboBox ItemsSource="{Binding Qualities}" SelectedIndex="{Binding SelectedQuality}" />
+
+                        <TextBlock Classes="section" Text="VIRTUAL CAMERA" />
+                        <Border Classes="glass">
+                            <StackPanel Spacing="6">
+                                <ToggleSwitch Content="Use as webcam" IsChecked="{Binding IsVirtualCameraOn}"
+                                              IsEnabled="{Binding IsVirtualCameraAvailable}" />
+                                <TextBlock Text="{Binding VirtualCameraStatus}" Classes="muted" FontSize="12" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </DockPanel>
+        </Border>
+
+        <!-- ===== Preview ===== -->
+        <Grid Grid.Column="1" Margin="0,10,10,10" RowDefinitions="*,Auto">
+            <Border x:Name="PreviewFrame" CornerRadius="22" ClipToBounds="True" Background="#0A0D24"
+                    BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
+                <Grid>
+                    <Image x:Name="PreviewImage" Stretch="Uniform" IsVisible="{Binding IsLive}" />
+
+                    <!-- Waiting state: covers the whole preview, so no stale picture shows through -->
+                    <Grid IsVisible="{Binding !IsLive}" Background="#0A0D24">
+                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10" MaxWidth="420" Margin="24">
+                        <Image Source="avares://mooncam/Assets/mooncam.png" Width="96" Height="96" Opacity="0.9" />
+                        <TextBlock Classes="title" HorizontalAlignment="Center" Text="{Binding StatusTitle}" />
+                        <TextBlock Classes="muted" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"
+                                   Text="{Binding StatusDetail}" />
+                        <Border Classes="glass" Margin="0,12,0,0">
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="1  Enable USB debugging in Developer options" Classes="muted" FontSize="12.5" />
+                                <TextBlock Text="2  Connect the phone with a USB cable" Classes="muted" FontSize="12.5" />
+                                <TextBlock Text="3  Press Connect via USB and allow MoonCam on the phone" Classes="muted" FontSize="12.5" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                    </Grid>
+
+                    <!-- LIVE badge -->
+                    <Border IsVisible="{Binding IsLive}" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="16"
+                            Background="#CC0B1026" CornerRadius="999" Padding="10,5">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <Ellipse Width="8" Height="8" Fill="{StaticResource LiveBrush}" />
+                            <TextBlock Text="LIVE" Classes="mono" FontSize="11" FontWeight="Medium" LetterSpacing="1.5" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Border>
+
+            <!-- Status bar: stats and notices -->
+            <Grid Grid.Row="1" ColumnDefinitions="*,Auto" Margin="6,10,6,0">
+                <TextBlock Text="{Binding Notice}" Classes="muted" FontSize="12.5" TextTrimming="CharacterEllipsis" />
+                <TextBlock Grid.Column="1" Text="{Binding StatsText}" Classes="muted mono" FontSize="12" />
+            </Grid>
+        </Grid>
+    </Grid>
+</Window>

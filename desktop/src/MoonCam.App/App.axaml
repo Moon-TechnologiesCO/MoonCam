@@ -1,0 +1,120 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="MoonCam.App.App"
+             RequestedThemeVariant="Dark">
+
+    <!-- Moon Technologies palette and type (brand/BRAND.md). One place for every colour and font. -->
+    <Application.Resources>
+        <FontFamily x:Key="MoonSans">avares://mooncam/Assets/Fonts#Moon Sans</FontFamily>
+        <FontFamily x:Key="MoonMono">avares://mooncam/Assets/Fonts#Moon Mono</FontFamily>
+
+        <Color x:Key="SystemAccentColor">#4F86FF</Color>
+        <Color x:Key="SystemAccentColorDark1">#2F5FD0</Color>
+        <Color x:Key="SystemAccentColorDark2">#2A52B8</Color>
+        <Color x:Key="SystemAccentColorDark3">#24469E</Color>
+        <Color x:Key="SystemAccentColorLight1">#6E9BFF</Color>
+        <Color x:Key="SystemAccentColorLight2">#8FB1FF</Color>
+        <Color x:Key="SystemAccentColorLight3">#B0C8FF</Color>
+
+        <LinearGradientBrush x:Key="NightGradient" StartPoint="0%,0%" EndPoint="35%,100%">
+            <GradientStop Color="#101633" Offset="0" />
+            <GradientStop Color="#1F1752" Offset="1" />
+        </LinearGradientBrush>
+        <LinearGradientBrush x:Key="AccentGradient" StartPoint="0%,0%" EndPoint="100%,0%">
+            <GradientStop Color="#2F5FD0" Offset="0" />
+            <GradientStop Color="#6E3FD8" Offset="1" />
+        </LinearGradientBrush>
+
+        <SolidColorBrush x:Key="GlassBrush" Color="#12FFFFFF" />
+        <SolidColorBrush x:Key="GlassStrongBrush" Color="#1FFFFFFF" />
+        <SolidColorBrush x:Key="GlassBorderBrush" Color="#22FFFFFF" />
+        <SolidColorBrush x:Key="TextBrush" Color="#FFF8E7" />
+        <SolidColorBrush x:Key="MutedBrush" Color="#C9CFF5" />
+        <SolidColorBrush x:Key="FaintBrush" Color="#9EA5D6" />
+        <SolidColorBrush x:Key="GlowBrush" Color="#FFE9A8" />
+        <SolidColorBrush x:Key="LiveBrush" Color="#FF5F57" />
+        <SolidColorBrush x:Key="OkBrush" Color="#7BE3B5" />
+    </Application.Resources>
+
+    <Application.Styles>
+        <FluentTheme />
+
+        <Style Selector="Window">
+            <Setter Property="FontFamily" Value="{StaticResource MoonSans}" />
+        </Style>
+
+        <Style Selector="TextBlock.title">
+            <Setter Property="FontSize" Value="22" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+        </Style>
+        <Style Selector="TextBlock.section">
+            <Setter Property="FontFamily" Value="{StaticResource MoonMono}" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="LetterSpacing" Value="1.5" />
+            <Setter Property="Foreground" Value="{StaticResource FaintBrush}" />
+            <Setter Property="Margin" Value="4,18,0,8" />
+        </Style>
+        <Style Selector="TextBlock.muted">
+            <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+        </Style>
+        <Style Selector="TextBlock.mono">
+            <Setter Property="FontFamily" Value="{StaticResource MoonMono}" />
+        </Style>
+
+        <!-- Glass card -->
+        <Style Selector="Border.glass">
+            <Setter Property="Background" Value="{StaticResource GlassBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource GlassBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="16" />
+            <Setter Property="Padding" Value="14,12" />
+        </Style>
+
+        <!-- Primary button: accent gradient pill -->
+        <Style Selector="Button.primary">
+            <Setter Property="Background" Value="{StaticResource AccentGradient}" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="CornerRadius" Value="999" />
+            <Setter Property="Padding" Value="18,10" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.primary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource AccentGradient}" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="Opacity" Value="0.92" />
+        </Style>
+
+        <!-- Quiet glass button -->
+        <Style Selector="Button.ghost">
+            <Setter Property="Background" Value="{StaticResource GlassBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource GlassBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Padding" Value="10,6" />
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+        </Style>
+
+        <!-- macOS traffic lights -->
+        <Style Selector="Button.light">
+            <Setter Property="Width" Value="13" />
+            <Setter Property="Height" Value="13" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="CornerRadius" Value="7" />
+            <Setter Property="BorderThickness" Value="0" />
+        </Style>
+        <Style Selector="Button.light.close"><Setter Property="Background" Value="#FF5F57" /></Style>
+        <Style Selector="Button.light.minimize"><Setter Property="Background" Value="#FEBC2E" /></Style>
+        <Style Selector="Button.light.zoom"><Setter Property="Background" Value="#28C840" /></Style>
+        <Style Selector="Button.light:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Opacity" Value="0.8" />
+        </Style>
+
+        <Style Selector="ComboBox">
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+        </Style>
+    </Application.Styles>
+</Application>
