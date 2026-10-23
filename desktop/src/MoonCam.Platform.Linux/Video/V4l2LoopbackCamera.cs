@@ -8,7 +8,10 @@ public sealed record LoopbackDevice(string Path, string Card);
 
 /// <summary>
 /// Writes I420 frames into a v4l2loopback device, which every Linux video app sees as a webcam.
-/// The output format is (re)negotiated whenever the incoming resolution changes.
+///
+/// When the phone's resolution changes, the device format follows it — unless an app (OBS, Zoom…) is reading
+/// the camera: Linux then locks the format, so frames are scaled to the locked size instead. The app never
+/// sees the camera disappear or change under its feet.
 /// </summary>
 public sealed unsafe class V4l2LoopbackCamera : IVirtualCamera
 {
@@ -22,6 +25,7 @@ public sealed unsafe class V4l2LoopbackCamera : IVirtualCamera
     {
         DevicePath = devicePath;
         _fd = fd;
+        _format = ReadFormat();
     }
 
     public string DevicePath { get; }
@@ -69,8 +73,8 @@ public sealed unsafe class V4l2LoopbackCamera : IVirtualCamera
         {
             if (_fd < 0)
                 return;
-            if (_format != (frame.Width, frame.Height))
-                SetFormat(frame.Width, frame.Height);
+            if (_format != (frame.Width, frame.Height) && !TrySetFormat(frame.Width, frame.Height))
+                frame = I420Scaler.Scale(frame, _format.Width, _format.Height);
 
             fixed (byte* data = frame.Data)
             {
@@ -81,15 +85,35 @@ public sealed unsafe class V4l2LoopbackCamera : IVirtualCamera
         }
     }
 
-    private void SetFormat(int width, int height)
+    /// <summary>Changes the device resolution. False when a reader holds the current format (EBUSY).</summary>
+    private bool TrySetFormat(int width, int height)
     {
         var format = V4l2.OutputFormat(width, height);
         fixed (byte* p = format)
         {
             if (V4l2.ioctl(_fd, V4l2.VidiocSetFormat, p) != 0)
-                throw new IOException($"{DevicePath} refused {width}x{height} I420 (errno {Marshal.GetLastPInvokeError()}). Close apps using the camera and try again.");
+            {
+                var errno = Marshal.GetLastPInvokeError();
+                if (errno == V4l2.ErrorBusy && _format is { Width: > 0, Height: > 0 })
+                    return false;
+                throw new IOException($"{DevicePath} refused {width}x{height} I420 (errno {errno}).");
+            }
         }
         _format = (width, height);
+        return true;
+    }
+
+    /// <summary>The format the device already has (another writer or reader may have fixed it), or (0,0).</summary>
+    private (int Width, int Height) ReadFormat()
+    {
+        var format = V4l2.OutputFormatQuery();
+        fixed (byte* p = format)
+        {
+            if (V4l2.ioctl(_fd, V4l2.VidiocGetFormat, p) != 0)
+                return (0, 0);
+        }
+        var (width, height, pixelFormat) = V4l2.ParseFormat(format);
+        return pixelFormat == V4l2.PixelFormatYuv420 && width > 0 && height > 0 ? (width, height) : (0, 0);
     }
 
     public void Dispose()

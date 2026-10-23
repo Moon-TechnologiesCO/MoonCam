@@ -22,6 +22,7 @@ internal static partial class V4l2
     public const int FormatSize = 208;          // struct v4l2_format: u32 type, 4 bytes padding, 200-byte union
 
     public static readonly ulong VidiocQueryCap = Ioc(Read, 'V', 0, CapabilitySize);
+    public static readonly ulong VidiocGetFormat = Ioc(Read | Write, 'V', 4, FormatSize);
     public static readonly ulong VidiocSetFormat = Ioc(Read | Write, 'V', 5, FormatSize);
 
     private const uint Write = 1;
@@ -48,6 +49,24 @@ internal static partial class V4l2
         BinaryPrimitives.WriteUInt32LittleEndian(pix[24..], ColorspaceSrgb);
         return format;
     }
+
+    /// <summary>An empty v4l2_format asking for the current output format (VIDIOC_G_FMT).</summary>
+    public static byte[] OutputFormatQuery()
+    {
+        var format = new byte[FormatSize];
+        BinaryPrimitives.WriteUInt32LittleEndian(format, BufTypeVideoOutput);
+        return format;
+    }
+
+    /// <summary>Reads width, height and FourCC from a v4l2_format filled by the driver.</summary>
+    public static (int Width, int Height, uint PixelFormat) ParseFormat(ReadOnlySpan<byte> format)
+    {
+        var pix = format[8..];
+        return ((int)BinaryPrimitives.ReadUInt32LittleEndian(pix), (int)BinaryPrimitives.ReadUInt32LittleEndian(pix[4..]),
+            BinaryPrimitives.ReadUInt32LittleEndian(pix[8..]));
+    }
+
+    public const int ErrorBusy = 16; // EBUSY
 
     /// <summary>Reads driver and card names from a v4l2_capability buffer.</summary>
     public static (string Driver, string Card, uint DeviceCaps) ParseCapability(ReadOnlySpan<byte> capability)

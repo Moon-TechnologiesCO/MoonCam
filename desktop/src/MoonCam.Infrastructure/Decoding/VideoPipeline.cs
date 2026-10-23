@@ -38,8 +38,11 @@ public sealed class VideoPipeline : IAsyncDisposable
     /// <summary>Raised (on the network thread) when frames were dropped and a key frame is required.</summary>
     public event Action? KeyFrameNeeded;
 
-    /// <summary>Raised on the decoder thread when a frame cannot be decoded.</summary>
+    /// <summary>Raised on the decoder thread when a frame cannot be decoded. Decoding continues.</summary>
     public event Action<Exception>? DecodeFailed;
+
+    /// <summary>Raised on the decoder thread when a sink throws. The other sinks keep receiving pictures.</summary>
+    public event Action<IVideoSink, Exception>? SinkFailed;
 
     public long FramesDecoded => Interlocked.Read(ref _decoded);
     public long FramesDropped => Interlocked.Read(ref _dropped);
@@ -96,30 +99,49 @@ public sealed class VideoPipeline : IAsyncDisposable
     {
         await foreach (var item in _queue.Reader.ReadAllAsync().ConfigureAwait(false))
         {
+            IReadOnlyList<VideoFrame> pictures;
             try
             {
                 if (Interlocked.Exchange(ref _pendingConfig, null) is { } pending)
                     _decoder.Configure(pending);
-
                 switch (item)
                 {
                     case VideoConfig config:
                         _decoder.Configure(config);
-                        break;
+                        continue;
                     case Frame frame:
-                        foreach (var picture in _decoder.Decode(frame.Payload, frame.IsKeyFrame, frame.TimestampUs))
-                        {
-                            Interlocked.Increment(ref _decoded);
-                            foreach (var sink in _sinks)
-                                sink.Push(picture);
-                        }
+                        pictures = _decoder.Decode(frame.Payload, frame.IsKeyFrame, frame.TimestampUs);
                         break;
+                    default:
+                        continue;
                 }
             }
-            catch (Exception e) when (e is InvalidOperationException or NotSupportedException)
+            catch (Exception e) when (e is not OutOfMemoryException)
             {
+                // Fault boundary: a bad frame must never stop the video thread.
                 DecodeFailed?.Invoke(e);
+                continue;
             }
+
+            foreach (var picture in pictures)
+            {
+                Interlocked.Increment(ref _decoded);
+                foreach (var sink in _sinks)
+                    Deliver(sink, picture);
+            }
+        }
+    }
+
+    /// <summary>Fault boundary per sink: a failing virtual camera must not freeze the preview, and vice versa.</summary>
+    private void Deliver(IVideoSink sink, VideoFrame picture)
+    {
+        try
+        {
+            sink.Push(picture);
+        }
+        catch (Exception e) when (e is not OutOfMemoryException)
+        {
+            SinkFailed?.Invoke(sink, e);
         }
     }
 

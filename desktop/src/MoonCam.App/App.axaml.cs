@@ -4,6 +4,7 @@ using Avalonia.Markup.Xaml;
 using MoonCam.App.ViewModels;
 using MoonCam.App.Views;
 using MoonCam.Infrastructure.Decoding;
+using MoonCam.Infrastructure.Diagnostics;
 using MoonCam.Infrastructure.Streaming;
 using MoonCam.Platform.Linux.Setup;
 using MoonCam.Platform.Linux.Video;
@@ -19,7 +20,15 @@ public sealed class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            var controller = new StreamController(TimeProvider.System, () => new FfmpegVideoDecoder(), fixedToken: DevelopmentToken(desktop.Args));
+            var log = new FileEventLog();
+            AppDomain.CurrentDomain.UnhandledException += (_, e) => log.Warn("Unhandled exception", e.ExceptionObject as Exception);
+            TaskScheduler.UnobservedTaskException += (_, e) =>
+            {
+                log.Warn("Unobserved task exception", e.Exception);
+                e.SetObserved();
+            };
+            log.Info($"MoonCam {typeof(App).Assembly.GetName().Version} starting");
+            var controller = new StreamController(TimeProvider.System, () => new FfmpegVideoDecoder(), fixedToken: DevelopmentToken(desktop.Args), log: log);
             var setup = new LinuxSystemSetup(() => FfmpegVideoDecoder.IsAvailable);
             var viewModel = new MainViewModel(controller, new LinuxVirtualCameras(), setup, action => Avalonia.Threading.Dispatcher.UIThread.Post(action));
             var window = new MainWindow { DataContext = viewModel };

@@ -43,6 +43,43 @@ public class VirtualCameraIntegrationTests
         Assert.Equal("640,360", probe.Trim());
     }
 
+    [Fact]
+    public async Task A_resolution_change_while_an_app_is_reading_is_scaled_not_fatal()
+    {
+        var device = new LinuxVirtualCameras().Find().FirstOrDefault(d => d.Name.Contains("MoonCam", StringComparison.Ordinal));
+        if (device is null || !CommandExists("ffmpeg"))
+            return;
+
+        using var camera = V4l2LoopbackCamera.Open(device.Path);
+        using var stop = new CancellationTokenSource();
+        var size = (W: 640, H: 360);
+        var writer = Task.Run(async () =>
+        {
+            while (!stop.IsCancellationRequested)
+            {
+                camera.Push(Gradient(size.W, size.H)); // must never throw, even after the switch below
+                await Task.Delay(33);
+            }
+        });
+        await Task.Delay(300);
+
+        // A reader (like OBS) holds the device at 640x360 while the phone switches to 1280x720.
+        var output = Path.Combine(Path.GetTempPath(), $"mooncam-locked-{Guid.NewGuid():N}.png");
+        var reader = RunAsync("ffmpeg", "-hide_banner", "-loglevel", "error", "-f", "v4l2", "-i", device.Path,
+            "-frames:v", "45", "-update", "1", "-y", output);
+        await Task.Delay(500);
+        size = (1280, 720);
+        var (exitCode, log) = await reader;
+        await stop.CancelAsync();
+        await writer; // rethrows if Push failed
+
+        Assert.True(exitCode == 0, log);
+        var (_, probe) = await RunAsync("ffprobe", "-v", "error", "-select_streams", "v:0",
+            "-show_entries", "stream=width,height", "-of", "csv=p=0", output);
+        File.Delete(output);
+        Assert.Equal("640,360", probe.Trim()); // the reader kept its size; MoonCam scaled for it
+    }
+
     private static VideoFrame Gradient(int width, int height)
     {
         var data = new byte[VideoFrame.SizeOf(width, height)];

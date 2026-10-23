@@ -1,4 +1,5 @@
 using System.Net;
+using MoonCam.Core.Diagnostics;
 using MoonCam.Core.Media;
 using MoonCam.Core.Protocol;
 using MoonCam.Core.Session;
@@ -22,6 +23,7 @@ public sealed class StreamController : IAsyncDisposable
     private readonly int _port;
     private readonly Func<IVideoDecoder> _decoderFactory;
     private readonly AdbClient _adb;
+    private readonly IEventLog _log;
     private readonly List<IVideoSink> _sinks = [];
     private readonly Lock _lock = new();
     private MoonLinkServer? _server;
@@ -33,10 +35,13 @@ public sealed class StreamController : IAsyncDisposable
     private VideoConfig? _videoConfig;
     private long _lastStatsFrames;
     private long _lastStatsTimestamp;
+    private string? _lastProblem;
 
     /// <param name="fixedToken">Development only: a known token so the FakePhone tool can connect.</param>
-    public StreamController(TimeProvider time, Func<IVideoDecoder> decoderFactory, AdbClient? adb = null, int port = MoonLinkServer.DefaultPort, string? fixedToken = null)
+    public StreamController(TimeProvider time, Func<IVideoDecoder> decoderFactory, AdbClient? adb = null, int port = MoonLinkServer.DefaultPort,
+        string? fixedToken = null, IEventLog? log = null)
     {
+        _log = log ?? NullEventLog.Instance;
         _time = time;
         _decoderFactory = decoderFactory;
         _adb = adb ?? new AdbClient();
@@ -73,7 +78,9 @@ public sealed class StreamController : IAsyncDisposable
     {
         _pipeline = new VideoPipeline(_decoderFactory());
         _pipeline.KeyFrameNeeded += () => _ = SendAsync(new ControlMessage(ControlOps.KeyFrame));
-        _pipeline.DecodeFailed += e => Notice?.Invoke($"Video decoding problem: {e.Message}");
+        _pipeline.DecodeFailed += e => ReportProblem("Video decoding problem", e);
+        _pipeline.SinkFailed += (sink, e) => ReportProblem(
+            sink is IVirtualCamera ? "The virtual camera could not be updated; the preview continues" : "Preview problem", e);
         foreach (var sink in _sinks)
             _pipeline.AddSink(sink);
 
@@ -82,10 +89,12 @@ public sealed class StreamController : IAsyncDisposable
         {
             _session = session;
             _state.TryMoveTo(ConnectionState.Handshaking);
+            _log.Info("Phone connecting");
         };
         _server.SessionEnded += OnSessionEnded;
         _server.Start();
         _state.TryMoveTo(ConnectionState.Listening);
+        _log.Info($"Listening on {_server.LocalEndpoint}");
     }
 
     public void AddSink(IVideoSink sink)
@@ -123,6 +132,7 @@ public sealed class StreamController : IAsyncDisposable
         if (errors.Count > 0)
             throw new ArgumentException(string.Join(" ", errors), nameof(settings));
         _settings = settings;
+        _log.Info($"Settings: camera {settings.CameraId}, {settings.Width}x{settings.Height} @ {settings.Fps} fps, {settings.Quality}");
         if (_session?.Phone is not null)
             await SendAsync(settings.ToStartCommand()).ConfigureAwait(false);
     }
@@ -133,6 +143,7 @@ public sealed class StreamController : IAsyncDisposable
         DisableVirtualCamera();
         _virtualCamera = camera;
         AddSink(camera);
+        _log.Info($"Virtual camera on: {camera.DevicePath}");
     }
 
     public void DisableVirtualCamera()
@@ -156,6 +167,17 @@ public sealed class StreamController : IAsyncDisposable
         return new StreamStats(_videoConfig?.Width ?? 0, _videoConfig?.Height ?? 0, fps, _pipeline?.FramesDropped ?? 0, _session?.RoundTripTime);
     }
 
+    /// <summary>Logs every problem; shows it to the user once until a different one happens.</summary>
+    private void ReportProblem(string what, Exception error)
+    {
+        _log.Warn(what, error);
+        var text = $"{what}: {error.Message}";
+        if (text == _lastProblem)
+            return;
+        _lastProblem = text;
+        Notice?.Invoke(text);
+    }
+
     private async Task SendAsync(ControlMessage message)
     {
         try
@@ -172,6 +194,7 @@ public sealed class StreamController : IAsyncDisposable
     private void OnSessionEnded(ServerSession session, SessionEnd end)
     {
         var wasAuthorised = session.Phone is not null;
+        _log.Info($"Session ended: {end.Reason}{(end.Detail is null ? "" : $" ({end.Detail})")}");
         _session = null;
         _videoConfig = null;
         var next = wasAuthorised && end.Reason is SessionEndReason.TimedOut or SessionEndReason.ProtocolError
@@ -203,8 +226,12 @@ public sealed class StreamController : IAsyncDisposable
         public WelcomeMessage Authenticate(HelloMessage hello)
         {
             if (!SessionToken.Matches(owner._token, hello.Token))
+            {
+                owner._log.Warn($"Refused a phone with an invalid token ({hello.Manufacturer} {hello.Model})");
                 return new WelcomeMessage(false, null, Environment.MachineName, "This phone was not invited by this computer.");
+            }
             owner._state.TryMoveTo(ConnectionState.Connected);
+            owner._log.Info($"Phone connected: {hello.Manufacturer} {hello.Model}, Android {hello.AndroidVersion}, app {hello.AppVersion}");
             return new WelcomeMessage(true, Guid.NewGuid().ToString("N"), Environment.MachineName);
         }
 
@@ -217,6 +244,7 @@ public sealed class StreamController : IAsyncDisposable
 
         public void OnVideoConfig(VideoConfig config)
         {
+            owner._log.Info($"Video: {config.Codec} {config.Width}x{config.Height} @ {config.Fps} fps");
             owner._videoConfig = config;
             owner._pipeline?.Configure(config);
         }

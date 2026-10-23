@@ -9,6 +9,7 @@ public class V4l2Tests
     public void Ioctl_numbers_match_the_kernel_headers()
     {
         Assert.Equal(0x80685600UL, V4l2.VidiocQueryCap);   // VIDIOC_QUERYCAP
+        Assert.Equal(0xC0D05604UL, V4l2.VidiocGetFormat);  // VIDIOC_G_FMT
         Assert.Equal(0xC0D05605UL, V4l2.VidiocSetFormat);  // VIDIOC_S_FMT
     }
 
@@ -23,6 +24,12 @@ public class V4l2Tests
         Assert.Equal(720u, BinaryPrimitives.ReadUInt32LittleEndian(format.AsSpan(12)));
         Assert.Equal(0x32315559u, BinaryPrimitives.ReadUInt32LittleEndian(format.AsSpan(16))); // 'YU12'
         Assert.Equal(1280u * 720 * 3 / 2, BinaryPrimitives.ReadUInt32LittleEndian(format.AsSpan(28)));
+    }
+
+    [Fact]
+    public void Parses_the_format_it_wrote()
+    {
+        Assert.Equal((1280, 720, V4l2.PixelFormatYuv420), V4l2.ParseFormat(V4l2.OutputFormat(1280, 720)));
     }
 
     [Fact]
