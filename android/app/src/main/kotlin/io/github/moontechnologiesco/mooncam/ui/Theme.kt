@@ -24,6 +24,7 @@ object MoonColors {
     val Glass = Color(0x14FFFFFF)
     val GlassBorder = Color(0x22FFFFFF)
     val Live = Color(0xFFFF5F57)
+    val Glow = Color(0xFFFFE9A8)
 }
 
 val MoonSans = FontFamily(

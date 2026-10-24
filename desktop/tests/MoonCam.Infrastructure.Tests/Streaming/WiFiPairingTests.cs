@@ -83,6 +83,23 @@ public sealed class WiFiPairingTests : IAsyncDisposable
         Assert.Null(second.Pairing);
     }
 
+    [Fact]
+    public async Task A_phone_that_leaves_mid_pairing_frees_the_slot_for_the_next_attempt()
+    {
+        var pairing = _controller.Pairing!;
+        pairing.OpenWindow();
+        await using (var phone = await WiFiPhone.ConnectAsync(_controller.WiFiPort!.Value, _phoneCertificate))
+        {
+            Assert.True((await phone.HelloAsync(pairing: true)).Accepted);
+            await phone.RunPairingAsync();
+            await WaitAsync(() => pairing.Pending?.Code);
+        } // the person pressed Cancel on the phone
+
+        await WaitAsync(() => pairing.Pending is null ? "freed" : null);
+        await using var again = await WiFiPhone.ConnectAsync(_controller.WiFiPort!.Value, _phoneCertificate);
+        Assert.True((await again.HelloAsync(pairing: true)).Accepted);
+    }
+
     private static async Task<string> WaitAsync(Func<string?> probe)
     {
         for (var i = 0; i < 200; i++)

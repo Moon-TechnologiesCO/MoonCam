@@ -6,9 +6,9 @@ proves it works. Platforms: **Android** (phone) and **Linux / Ubuntu 26.04** (co
 | Stage | Goal | Done when |
 |---|---|---|
 | **0. Foundations** ✅ | Architecture, decisions, protocol spec, repository, CI | Docs reviewed; `dotnet test` and the Kotlin protocol tests pass in CI |
-| **1. First light** 🚧 | USB connection and live preview | Plug the phone in → the desktop launches the app → the back camera shows in the MoonCam window at 720p30. *Desktop done and verified end to end with FakePhone; Android app written, pending first build on a device.* |
-| **2. Real webcam** | Virtual camera + camera choice | "MoonCam" appears in Meet, Zoom, Discord and OBS; switch front/back/ultra-wide/tele; choose resolution, FPS, quality |
-| **3. Sound & Wi-Fi** | Microphone, sync, Wi-Fi | "MoonCam Microphone" in every app with RNNoise; lip sync within ±40 ms; pair over Wi-Fi with a 6-digit code; auto-reconnect |
+| **1. First light** ✅ | USB connection and live preview | Plug the phone in → the desktop launches the app → the back camera shows in the MoonCam window. *Verified on a Redmi Note 13 Pro: 1080p30 into OBS.* |
+| **2. Real webcam** 🚧 | Virtual camera, camera choice, Wi-Fi | "MoonCam" appears in Meet, Zoom, Discord and OBS; switch front/back/ultra-wide/tele; choose resolution, FPS, quality; pair over Wi-Fi with a 6-digit code and connect on its own afterwards. *Virtual camera verified in OBS; Wi-Fi pairing built on both sides, pending a test on the real phone; lower desktop CPU use (VA-API) next.* |
+| **3. Sound** | Microphone and sync | "MoonCam Microphone" in every app with RNNoise; lip sync within ±40 ms |
 | **4. Polish** | Product quality | macOS-style UI finished, tray icon, Spanish/English, release on GitHub with demo video. *Already done early: `.deb` that installs every dependency (signed driver, no Secure Boot step).* |
 | **5. Continuity** | Use the phone from the computer | "Show my phone" opens scrcpy; camera keeps streaming; auto-connect when the cable is plugged in |
 | **6. Gestures** | Hands-free control | MediaPipe gestures: privacy curtain, mute, switch camera, reactions |

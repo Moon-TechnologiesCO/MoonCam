@@ -232,6 +232,7 @@ public sealed class StreamController : IAsyncDisposable
     private void OnSessionEnded(ServerSession session, SessionEnd end)
     {
         _log.Info($"Session ended: {end.Reason}{(end.Detail is null ? "" : $" ({end.Detail})")}");
+        ((Handler)session.Handler).AbandonPairing();
         if (!ReferenceEquals(Interlocked.CompareExchange(ref _session, null, session), session))
         {
             // Not the active phone (e.g. a second phone that was turned away): nothing else changes.
@@ -371,6 +372,15 @@ public sealed class StreamController : IAsyncDisposable
                     owner.Notice?.Invoke(text);
                     break;
             }
+        }
+
+        /// <summary>The phone left before pairing finished: free the slot so a new attempt can start at once.</summary>
+        public void AbandonPairing()
+        {
+            if (_pairing is not { IsFinished: false } pairing)
+                return;
+            pairing.StateChanged -= OnPairingChanged;
+            pairing.Fail("The phone left before pairing finished.");
         }
 
         /// <summary>Both sides confirmed: trust the phone and let media through. A rejection ends the session.</summary>

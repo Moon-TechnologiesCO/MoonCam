@@ -4,8 +4,17 @@ MoonLink is the protocol between the MoonCam phone app (client) and the MoonCam 
 It is deliberately small: a fixed preamble, then a stream of length-prefixed frames.
 All integers are **big-endian** (network order).
 
-Default port: **47321/tcp**. Over USB the phone connects to `127.0.0.1:47321`, which `adb reverse`
-tunnels to the computer. Over Wi-Fi (stage 3) the same bytes travel inside TLS 1.3.
+Two transports carry the same bytes; the phone is always the client.
+
+| Transport | Desktop listens on | Who proves what |
+|---|---|---|
+| **USB** | `127.0.0.1:47321/tcp`, reached through `adb reverse` | The desktop passes a one-time token to the phone through ADB; the phone sends it back in `HELLO` |
+| **Wi-Fi** | `0.0.0.0:47322/tcp`, **TLS 1.3 only** | Both sides present a self-signed certificate (client certificate required). Each side identifies the other by the SHA-256 fingerprint of its certificate, learned once by pairing (§7) |
+
+**Discovery.** The desktop announces itself with mDNS (Avahi) as service type `_mooncam._tcp`, instance name
+`MoonCam on <hostname>`, port 47322 and TXT records `v=1` and `fp=<first 16 hex digits of its certificate
+fingerprint>`. The phone uses `fp` only to recognise computers it already paired with; the announcement is not
+trusted for anything else, because TLS proves the identity afterwards.
 
 Shared test vectors live in [`protocol/test-vectors/`](../protocol/test-vectors): both the Kotlin and the C#
 test suites decode and re-encode them, so the two implementations cannot drift apart.
@@ -126,6 +135,11 @@ considers the connection lost. The phone reconnects with exponential back-off (0
 | `stop` | desktop → phone | — | stop streaming, keep the session |
 | `keyFrame` | desktop → phone | — | send an IDR as soon as possible |
 | `status` | phone → desktop | `streaming`, `camera`, `message` | state changes, e.g. "camera busy" |
+| `pairCommit` | phone → desktop | `data` = base64 SHA-256 of the phone's 32-byte nonce | pairing step 1 (§7) |
+| `pairNonce` | desktop → phone | `data` = base64 desktop nonce (32 bytes) | pairing step 2 |
+| `pairReveal` | phone → desktop | `data` = base64 phone nonce | pairing step 3; must match the commitment |
+| `pairConfirm` | phone → desktop | — | the person on the phone saw the same code |
+| `paired` | desktop → phone | `message` = computer name | both people confirmed; the phone is trusted from now on |
 
 Unknown `op` values are ignored (forward compatibility); unknown frame **types** are not.
 
@@ -133,3 +147,32 @@ Unknown `op` values are ignored (forward compatibility); unknown frame **types**
 
 The preamble version changes only for incompatible changes. New `CONTROL` operations and new optional JSON
 fields are compatible changes and do not bump the version.
+
+## 7. Wi-Fi pairing
+
+A phone that is not paired yet sends `HELLO` with `"pairing": true`. The desktop accepts it only while the
+person has pairing open on the computer ("Pair over Wi-Fi", 2 minutes, at most 5 attempts, one phone at a
+time) and answers `WELCOME` with `"pairing": true`. Until `paired`, the desktop ignores media and sends no
+commands.
+
+```mermaid
+sequenceDiagram
+  participant P as Phone
+  participant D as Desktop
+  P->>D: HELLO {pairing: true}
+  D->>P: WELCOME {accepted, pairing: true}
+  P->>D: pairCommit {SHA-256(Np)}
+  D->>P: pairNonce {Nd}
+  P->>D: pairReveal {Np}
+  Note over P,D: both show code = SHA-256("MoonCam pairing v1" ‖ phoneFp ‖ desktopFp ‖ Np ‖ Nd)
+  P->>D: pairConfirm (person taps "Codes match")
+  Note over D: person clicks "Codes match — Pair"
+  D->>P: paired {computer name}
+  P->>D: CAPABILITIES (the session continues as usual)
+```
+
+The code is the first 4 bytes of the hash, big-endian, modulo 10⁶, shown as six digits (`482 913`). The phone
+commits to its nonce before it sees the desktop's, so a man in the middle, who would present different
+certificates to each side, cannot pick nonces that make the two codes equal (1 chance in a million per try,
+and tries are limited). A `BYE` during pairing means the desktop cancelled it. The shared vector
+`pairing` in `protocol/test-vectors/moonlink-v1.json` fixes the computation for both implementations.

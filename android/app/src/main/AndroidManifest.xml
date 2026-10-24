@@ -1,9 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Least privilege: only what stage 1 (USB video) needs. RECORD_AUDIO arrives with the microphone stage. -->
+    <!-- Least privilege: only what video over USB and Wi-Fi needs. RECORD_AUDIO arrives with the microphone stage. -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Android 17+: finding and reaching the computer on the local network is a runtime permission. -->
+    <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
+    <!-- Keeps Wi-Fi out of power saving while streaming (WifiLock). -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />

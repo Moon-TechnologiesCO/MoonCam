@@ -12,21 +12,24 @@ Local only · no cloud · no account · no telemetry</p>
 </p>
 
 MoonCam turns an Android phone into a **real webcam** for your computer. The picture appears as a camera
-called **"MoonCam"** in OBS Studio, Discord, Zoom, Google Meet, Teams and your browser — over a USB cable today,
-and over Wi-Fi soon.
+called **"MoonCam"** in OBS Studio, Discord, Zoom, Google Meet, Teams and your browser — over a USB cable or
+over Wi-Fi.
 
-> **Status:** Stage 1 of 6 — USB connection and live preview work end to end. See the [roadmap](docs/roadmap.md).
+> **Status:** Stage 2 of 6 — USB, preview and the virtual camera work end to end; Wi-Fi pairing is in testing.
+> See the [roadmap](docs/roadmap.md).
 > Linux (Ubuntu 26.04) and Android 10+.
 
 ## Features
 
 - **USB connection** through ADB, with a one-time token and a consent prompt on the phone
+- **Wi-Fi connection** over TLS 1.3: pair once with a six-digit code shown on both screens, then the phone
+  connects on its own whenever MoonCam is open on the same network
 - **Live preview** in a macOS-style window, with the Moon type family
 - **Virtual camera** (v4l2loopback, Canonical-signed module: works with Secure Boot, no reboot)
 - **Front, back, ultra-wide and telephoto** lenses, when the phone exposes them
 - **Resolution, frame rate and quality** presets (480p–1080p, 30/60 fps)
 - **Resilient**: heartbeats, automatic reconnection, frame dropping instead of growing delay
-- Coming next: microphone with noise suppression, Wi-Fi pairing, phone mirroring, hand gestures
+- Coming next: microphone with noise suppression, phone mirroring, hand gestures
 
 ## Install (Ubuntu 26.04)
 
