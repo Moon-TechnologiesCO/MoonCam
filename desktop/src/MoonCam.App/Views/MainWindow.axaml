@@ -89,6 +89,31 @@
                             </StackPanel>
                         </Border>
                         <Button Classes="primary" Margin="0,10,0,0" Content="Connect via USB" Command="{Binding ConnectUsbCommand}" />
+                        <Button Classes="ghost" Margin="0,8,0,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                                Content="Pair over Wi-Fi" Command="{Binding PairOverWiFiCommand}"
+                                IsVisible="{Binding IsWiFiAvailable}" />
+
+                        <!-- Phones allowed over Wi-Fi -->
+                        <StackPanel IsVisible="{Binding HasPairedPhones}">
+                            <TextBlock Classes="section" Text="PAIRED PHONES" />
+                            <ItemsControl ItemsSource="{Binding PairedPhones}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:PairedPhoneOption">
+                                        <Border Classes="glass" Margin="0,0,0,6" Padding="12,8">
+                                            <Grid ColumnDefinitions="*,Auto">
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Name}" FontSize="12.5" FontWeight="Medium" />
+                                                    <TextBlock Text="{Binding Detail}" Classes="muted" FontSize="11" />
+                                                </StackPanel>
+                                                <Button Grid.Column="1" Classes="ghost" Content="Remove" FontSize="11.5" VerticalAlignment="Center"
+                                                        Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).RemovePairedPhoneCommand}"
+                                                        CommandParameter="{Binding}" />
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
 
                         <TextBlock Classes="section" Text="CAMERA" />
                         <ComboBox ItemsSource="{Binding Cameras}" SelectedItem="{Binding SelectedCamera}">
@@ -140,9 +165,34 @@
                                 <TextBlock Text="1  Enable USB debugging in Developer options" Classes="muted" FontSize="12.5" />
                                 <TextBlock Text="2  Connect the phone with a USB cable" Classes="muted" FontSize="12.5" />
                                 <TextBlock Text="3  Press Connect via USB and allow MoonCam on the phone" Classes="muted" FontSize="12.5" TextWrapping="Wrap" />
+                                <TextBlock Text="Or pair once over Wi-Fi: after that the phone connects by itself." Classes="muted" FontSize="12" Opacity="0.85" TextWrapping="Wrap" Margin="0,4,0,0" />
                             </StackPanel>
                         </Border>
                     </StackPanel>
+                    </Grid>
+
+                    <!-- Wi-Fi pairing: front and centre, the code is the one thing the user must look at -->
+                    <Grid IsVisible="{Binding IsPairingOpen}" Background="#0A0D24">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12" MaxWidth="460" Margin="24">
+                            <Image Source="avares://mooncam/Assets/mooncam.png" Width="72" Height="72" />
+                            <StackPanel IsVisible="{Binding PairingCode, Converter={x:Static ObjectConverters.IsNull}}" Spacing="8">
+                                <TextBlock Classes="title" HorizontalAlignment="Center" Text="Pair over Wi-Fi" />
+                                <TextBlock Classes="muted" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"
+                                           Text="On your phone, open MoonCam and choose this computer. Both must be on the same Wi-Fi network." />
+                                <TextBlock Classes="mono muted" HorizontalAlignment="Center" FontSize="13" Text="{Binding PairingCountdown}" />
+                            </StackPanel>
+                            <StackPanel IsVisible="{Binding PairingCode, Converter={x:Static ObjectConverters.IsNotNull}}" Spacing="8">
+                                <TextBlock Classes="title" HorizontalAlignment="Center" Text="Does your phone show this code?" />
+                                <TextBlock Classes="muted" HorizontalAlignment="Center" Text="{Binding PairingPhone}" />
+                                <TextBlock Classes="mono" FontSize="56" FontWeight="Medium" LetterSpacing="4" HorizontalAlignment="Center"
+                                           Foreground="{StaticResource GlowBrush}" Text="{Binding PairingCode}" Margin="0,8" />
+                                <TextBlock Classes="muted" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" FontSize="12"
+                                           Text="Pair only if the six digits are exactly the same on both screens." />
+                                <Button Classes="primary" HorizontalAlignment="Center" MinWidth="220" Margin="0,6,0,0"
+                                        Content="Codes match — Pair" Command="{Binding ApprovePairingCommand}" />
+                            </StackPanel>
+                            <Button Classes="ghost" HorizontalAlignment="Center" HorizontalContentAlignment="Center" MinWidth="120" Content="Cancel" Command="{Binding CancelPairingCommand}" />
+                        </StackPanel>
                     </Grid>
 
                     <!-- LIVE badge -->

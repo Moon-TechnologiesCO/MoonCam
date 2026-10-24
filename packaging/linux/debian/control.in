@@ -6,7 +6,7 @@ Architecture: amd64
 Installed-Size: @SIZE@
 Depends: dotnet-runtime-10.0, libavcodec62 | libavcodec61 | libavcodec60,
  linux-modules-v4l2loopback-generic-hwe-26.04 | linux-modules-v4l2loopback-generic | linux-modules-v4l2loopback-oem-26.04,
- adb, pkexec, kmod
+ adb, avahi-utils, pkexec, kmod
 Conflicts: v4l2loopback-dkms (>= 0~)
 Maintainer: Moon Technologies <https://github.com/Moon-TechnologiesCO>
 Homepage: https://github.com/Moon-TechnologiesCO/MoonCam

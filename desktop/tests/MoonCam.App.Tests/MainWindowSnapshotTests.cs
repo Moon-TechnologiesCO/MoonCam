@@ -60,9 +60,27 @@ public class MainWindowSnapshotTests
         Save(window, "mooncam-live.png");
     }
 
-    private static (MainWindow, MainViewModel) Open()
+    [AvaloniaFact]
+    public void Pairing_card_shows_the_code_to_compare()
     {
-        var controller = new StreamController(TimeProvider.System, () => new NullDecoder(), port: 0);
+        var config = Directory.CreateTempSubdirectory("mooncam-ui-").FullName;
+        var wifi = new WiFiOptions(MoonCam.Infrastructure.Security.DesktopIdentity.LoadOrCreate(config),
+            new MoonCam.Core.Session.PairingCoordinator(new MoonCam.Infrastructure.Security.JsonPairedPhoneStore(config), TimeProvider.System),
+            Port: 0, Advertise: false);
+        var (window, vm) = Open(wifi);
+        vm.IsPairingOpen = true;
+        vm.PairingPhone = "Redmi Note 13 Pro";
+        vm.PairingCode = "482 913";
+        vm.StatusTitle = "Waiting for your phone";
+
+        Assert.True(vm.IsWiFiAvailable);
+        Save(window, "mooncam-pairing.png");
+        Directory.Delete(config, recursive: true);
+    }
+
+    private static (MainWindow, MainViewModel) Open(WiFiOptions? wifi = null)
+    {
+        var controller = new StreamController(TimeProvider.System, () => new NullDecoder(), port: 0, wifi: wifi);
         var vm = new MainViewModel(controller, new NoVirtualCameras(), new MissingDriverSetup());
         var window = new MainWindow { DataContext = vm, Width = 1080, Height = 700 };
         window.Show();
