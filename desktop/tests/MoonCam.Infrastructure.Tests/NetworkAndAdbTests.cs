@@ -33,7 +33,7 @@ public class NetworkAndAdbTests
     public async Task Server_runs_one_session_and_turns_a_second_phone_away()
     {
         var started = new TaskCompletionSource<ServerSession>();
-        await using var server = new MoonLinkServer(new IPEndPoint(IPAddress.Loopback, 0), () => new AcceptAll(), TimeProvider.System);
+        await using var server = new MoonLinkServer(new IPEndPoint(IPAddress.Loopback, 0), _ => new AcceptAll(), TimeProvider.System);
         server.SessionStarted += s => started.TrySetResult(s);
         server.Start();
 

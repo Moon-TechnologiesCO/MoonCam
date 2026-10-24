@@ -104,3 +104,32 @@ public class TestVectorTests
 
     private static byte[] Hex(string hex) => Convert.FromHexString(hex.Replace(" ", ""));
 }
+
+public class PairingVectorTests
+{
+    [Fact]
+    public void Pairing_code_and_commit_match_the_shared_vector()
+    {
+        var v = System.Text.Json.JsonDocument.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "TestVectors", "moonlink-v1.json")))
+            .RootElement.GetProperty("pairing");
+        byte[] H(string name) => Convert.FromHexString(v.GetProperty(name).GetString()!);
+
+        Assert.Equal(H("commitHex"), Pairing.Commit(H("phoneNonceHex")));
+        Assert.True(Pairing.VerifyCommit(H("commitHex"), H("phoneNonceHex")));
+        Assert.False(Pairing.VerifyCommit(H("commitHex"), H("desktopNonceHex")));
+        Assert.Equal(v.GetProperty("code").GetString(),
+            Pairing.Code(H("phoneFingerprintHex"), H("desktopFingerprintHex"), H("phoneNonceHex"), H("desktopNonceHex")));
+    }
+
+    [Fact]
+    public void A_different_certificate_gives_a_different_code()
+    {
+        var np = Pairing.NewNonce();
+        var nd = Pairing.NewNonce();
+        var real = Pairing.Code(new byte[32], new byte[32], np, nd);
+        var attacker = Pairing.Code(new byte[32], Enumerable.Repeat((byte)1, 32).ToArray(), np, nd);
+
+        Assert.NotEqual(real, attacker);
+        Assert.Equal("482 913", Pairing.Format("482913"));
+    }
+}

@@ -71,6 +71,9 @@ public sealed class ServerSession : IAsyncDisposable
         _heartbeat = new HeartbeatMonitor(time, _options.PeerTimeout);
     }
 
+    /// <summary>Receives this session's messages (one handler per connection).</summary>
+    public ISessionHandler Handler => _handler;
+
     /// <summary>The phone, once HELLO has been accepted.</summary>
     public HelloMessage? Phone { get; private set; }
 

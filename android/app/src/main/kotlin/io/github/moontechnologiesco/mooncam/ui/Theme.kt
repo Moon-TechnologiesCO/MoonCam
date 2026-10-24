@@ -1,6 +1,7 @@
 package io.github.moontechnologiesco.mooncam.ui
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
@@ -58,6 +59,8 @@ fun MoonCamTheme(content: @Composable () -> Unit) {
             onSurfaceVariant = MoonColors.Mist,
         ),
         typography = Typography().withFamily(MoonSans),
-        content = content,
-    )
+    ) {
+        // Without a Surface, Compose text falls back to black. This one gives every screen moonlight text.
+        Surface(color = MoonColors.Night, contentColor = MoonColors.Moonlight, content = content)
+    }
 }

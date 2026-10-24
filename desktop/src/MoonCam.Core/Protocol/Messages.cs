@@ -3,17 +3,21 @@ using System.Text.Json.Serialization;
 
 namespace MoonCam.Core.Protocol;
 
-/// <summary>First message from the phone: who it is, and the one-time token that proves it was invited.</summary>
+/// <summary>
+/// First message from the phone: who it is, and how it proves it may connect — the one-time token (USB) or its
+/// pinned TLS certificate (Wi-Fi). <see cref="Pairing"/> is true when it asks to pair over Wi-Fi.
+/// </summary>
 public sealed record HelloMessage(
     string DeviceName,
     string Manufacturer,
     string Model,
     string AndroidVersion,
     string AppVersion,
-    string Token);
+    string Token,
+    bool? Pairing = null);
 
-/// <summary>The desktop's answer to <see cref="HelloMessage"/>.</summary>
-public sealed record WelcomeMessage(bool Accepted, string? SessionId, string ServerName, string? Reason = null);
+/// <summary>The desktop's answer to <see cref="HelloMessage"/>. <see cref="Pairing"/>: accepted only to pair, no media yet.</summary>
+public sealed record WelcomeMessage(bool Accepted, string? SessionId, string ServerName, string? Reason = null, bool? Pairing = null);
 
 public sealed record ByeMessage(string Reason);
 
@@ -38,6 +42,13 @@ public static class ControlOps
     public const string Stop = "stop";
     public const string KeyFrame = "keyFrame";
     public const string Status = "status";
+
+    // Wi-Fi pairing (docs/security.md): commit → nonce → reveal → both screens show the code → confirm → paired.
+    public const string PairCommit = "pairCommit";
+    public const string PairNonce = "pairNonce";
+    public const string PairReveal = "pairReveal";
+    public const string PairConfirm = "pairConfirm";
+    public const string Paired = "paired";
 }
 
 /// <summary>A command or event. Fields that do not apply to an operation stay null and are not serialised.</summary>
@@ -50,7 +61,8 @@ public sealed record ControlMessage(
     int? BitrateBps = null,
     string? Codec = null,
     bool? Streaming = null,
-    string? Message = null);
+    string? Message = null,
+    string? Data = null);
 
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,

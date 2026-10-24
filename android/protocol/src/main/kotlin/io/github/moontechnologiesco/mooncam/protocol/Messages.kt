@@ -15,10 +15,17 @@ data class HelloMessage(
     val androidVersion: String,
     val appVersion: String,
     val token: String,
+    val pairing: Boolean? = null,
 )
 
 @Serializable
-data class WelcomeMessage(val accepted: Boolean, val sessionId: String? = null, val serverName: String, val reason: String? = null)
+data class WelcomeMessage(
+    val accepted: Boolean,
+    val sessionId: String? = null,
+    val serverName: String,
+    val reason: String? = null,
+    val pairing: Boolean? = null,
+)
 
 @Serializable
 data class ByeMessage(val reason: String)
@@ -46,6 +53,11 @@ object ControlOps {
     const val STOP = "stop"
     const val KEY_FRAME = "keyFrame"
     const val STATUS = "status"
+    const val PAIR_COMMIT = "pairCommit"
+    const val PAIR_NONCE = "pairNonce"
+    const val PAIR_REVEAL = "pairReveal"
+    const val PAIR_CONFIRM = "pairConfirm"
+    const val PAIRED = "paired"
 }
 
 /** A command or event; fields that do not apply to an operation stay null and are not sent. */
@@ -60,6 +72,7 @@ data class ControlMessage(
     val codec: String? = null,
     val streaming: Boolean? = null,
     val message: String? = null,
+    val data: String? = null,
 )
 
 /** Builds and reads the JSON-carrying frames. */

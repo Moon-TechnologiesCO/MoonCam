@@ -12,23 +12,32 @@
         Icon="avares://mooncam/Assets/mooncam.png"
         Title="MoonCam">
 
-    <!-- macOS-style window: our own title bar with traffic lights, a floating glass sidebar and the live
-         preview. Edges stay grabbable for resizing (see MainWindow.axaml.cs). -->
-    <Grid ColumnDefinitions="300,*">
+    <!-- macOS-style window: a full-width title bar (drag to move, double-click to zoom), a floating glass
+         sidebar and the live preview. Edges stay grabbable for resizing (see MainWindow.axaml.cs). -->
+    <Grid RowDefinitions="44,*">
+
+        <!-- ===== Title bar: the whole strip moves the window ===== -->
+        <Grid x:Name="TitleBar" Grid.Row="0" Background="Transparent" ColumnDefinitions="90,*,90">
+            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="20,0,0,0">
+                <Button x:Name="CloseButton" Classes="light close" ToolTip.Tip="Close" />
+                <Button x:Name="MinimizeButton" Classes="light minimize" ToolTip.Tip="Minimise" />
+                <Button x:Name="ZoomButton" Classes="light zoom" ToolTip.Tip="Zoom" />
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center"
+                        VerticalAlignment="Center" IsHitTestVisible="False">
+                <Image Source="avares://mooncam/Assets/mooncam.png" Width="18" Height="18" />
+                <TextBlock Text="MoonCam" FontWeight="SemiBold" FontSize="13" />
+                <TextBlock Text="·" Classes="muted" FontSize="13" />
+                <TextBlock Text="{Binding StatusTitle}" Classes="muted" FontSize="13" />
+            </StackPanel>
+        </Grid>
+
+    <Grid Grid.Row="1" ColumnDefinitions="300,*">
 
         <!-- ===== Sidebar ===== -->
-        <Border Grid.Column="0" Classes="glass" Margin="10" Padding="16,14" CornerRadius="20">
+        <Border Grid.Column="0" Classes="glass" Margin="10,0,10,10" Padding="16,14" CornerRadius="20">
             <DockPanel>
-                <!-- Title bar: traffic lights + drag area -->
-                <Grid x:Name="TitleBar" DockPanel.Dock="Top" Height="30" Background="Transparent">
-                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                        <Button x:Name="CloseButton" Classes="light close" ToolTip.Tip="Close" />
-                        <Button x:Name="MinimizeButton" Classes="light minimize" ToolTip.Tip="Minimise" />
-                        <Button x:Name="ZoomButton" Classes="light zoom" ToolTip.Tip="Zoom" />
-                    </StackPanel>
-                </Grid>
-
-                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="12" Margin="0,18,0,0">
+                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="12">
                     <Image Source="avares://mooncam/Assets/mooncam.png" Width="44" Height="44" />
                     <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="MoonCam" FontSize="20" FontWeight="SemiBold" />
@@ -113,7 +122,7 @@
         </Border>
 
         <!-- ===== Preview ===== -->
-        <Grid Grid.Column="1" Margin="0,10,10,10" RowDefinitions="*,Auto">
+        <Grid Grid.Column="1" Margin="0,0,10,10" RowDefinitions="*,Auto">
             <Border x:Name="PreviewFrame" CornerRadius="22" ClipToBounds="True" Background="#0A0D24"
                     BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
                 <Grid>
@@ -153,5 +162,6 @@
                 <TextBlock Grid.Column="1" Text="{Binding StatsText}" Classes="muted mono" FontSize="12" />
             </Grid>
         </Grid>
+    </Grid>
     </Grid>
 </Window>

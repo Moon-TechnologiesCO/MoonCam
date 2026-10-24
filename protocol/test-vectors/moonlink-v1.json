@@ -36,7 +36,13 @@
       "flags": 0,
       "timestampUs": 0,
       "payloadHex": "01050002d01e000000016742001f0000000168ce",
-      "videoConfig": { "codec": 1, "width": 1280, "height": 720, "fps": 30, "codecDataHex": "000000016742001f0000000168ce" }
+      "videoConfig": {
+        "codec": 1,
+        "width": 1280,
+        "height": 720,
+        "fps": 30,
+        "codecDataHex": "000000016742001f0000000168ce"
+      }
     },
     {
       "name": "audio config Opus 48 kHz mono",
@@ -45,7 +51,12 @@
       "flags": 0,
       "timestampUs": 0,
       "payloadHex": "010000bb8001",
-      "audioConfig": { "codec": 1, "sampleRate": 48000, "channels": 1, "codecDataHex": "" }
+      "audioConfig": {
+        "codec": 1,
+        "sampleRate": 48000,
+        "channels": 1,
+        "codecDataHex": ""
+      }
     },
     {
       "name": "negative timestamp is allowed (signed)",
@@ -60,24 +71,72 @@
     {
       "name": "hello",
       "type": 1,
-      "payload": { "deviceName": "Pixel 9", "manufacturer": "Google", "model": "Pixel 9", "androidVersion": "16", "appVersion": "0.1.0", "token": "abc123" }
+      "payload": {
+        "deviceName": "Pixel 9",
+        "manufacturer": "Google",
+        "model": "Pixel 9",
+        "androidVersion": "16",
+        "appVersion": "0.1.0",
+        "token": "abc123"
+      }
     },
     {
       "name": "welcome accepted",
       "type": 2,
-      "payload": { "accepted": true, "sessionId": "s-1", "serverName": "Lenovo-V14" }
+      "payload": {
+        "accepted": true,
+        "sessionId": "s-1",
+        "serverName": "Lenovo-V14"
+      }
     },
     {
       "name": "start command",
       "type": 4,
-      "payload": { "op": "start", "camera": "0", "width": 1280, "height": 720, "fps": 30, "bitrateBps": 2800000, "codec": "h264" }
+      "payload": {
+        "op": "start",
+        "camera": "0",
+        "width": 1280,
+        "height": 720,
+        "fps": 30,
+        "bitrateBps": 2800000,
+        "codec": "h264"
+      }
     }
   ],
   "invalid": [
-    { "name": "unknown type", "hex": "7f000000000000000000000000000000", "reason": "unknown frame type" },
-    { "name": "unknown flag", "hex": "11800000000000000000000000000000", "reason": "unknown flags" },
-    { "name": "reserved bits set", "hex": "11000001000000000000000000000000", "reason": "reserved must be zero" },
-    { "name": "payload too large", "hex": "11000000010000010000000000000000", "reason": "length above 16 MiB" },
-    { "name": "truncated header", "hex": "1100000000", "reason": "header shorter than 16 bytes" }
-  ]
+    {
+      "name": "unknown type",
+      "hex": "7f000000000000000000000000000000",
+      "reason": "unknown frame type"
+    },
+    {
+      "name": "unknown flag",
+      "hex": "11800000000000000000000000000000",
+      "reason": "unknown flags"
+    },
+    {
+      "name": "reserved bits set",
+      "hex": "11000001000000000000000000000000",
+      "reason": "reserved must be zero"
+    },
+    {
+      "name": "payload too large",
+      "hex": "11000000010000010000000000000000",
+      "reason": "length above 16 MiB"
+    },
+    {
+      "name": "truncated header",
+      "hex": "1100000000",
+      "reason": "header shorter than 16 bytes"
+    }
+  ],
+  "pairing": {
+    "description": "code = SHA-256('MoonCam pairing v1' || phoneFingerprint || desktopFingerprint || phoneNonce || desktopNonce); first 4 bytes big-endian mod 1,000,000, six digits. commit = SHA-256(phoneNonce). Fingerprints are SHA-256 of the DER certificates.",
+    "phoneFingerprintHex": "e83dc6621a725ebb1ccf39108ac75d3da8324c336fcdadd6e895d0bbbbdc7ff9",
+    "desktopFingerprintHex": "57c60f8e9c4b4dcc0beacd513034249d9b98e5a85f8d5038535a387d804d1043",
+    "phoneNonceHex": "0101010101010101010101010101010101010101010101010101010101010101",
+    "desktopNonceHex": "0202020202020202020202020202020202020202020202020202020202020202",
+    "commitHex": "72cd6e8422c407fb6d098690f1130b7ded7ec2f7f5e1d30bd9d521f015363793",
+    "code": "850843"
+  }
 }
