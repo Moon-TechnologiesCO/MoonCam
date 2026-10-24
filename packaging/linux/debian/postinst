@@ -16,9 +16,20 @@ configure_virtual_camera() {
     fi
 }
 
+# Lets phones reach MoonCam over Wi-Fi when ufw is in use, from private home and office networks only (never the
+# internet). The port only speaks TLS 1.3 to paired phones (docs/security.md); mDNS discovery is already
+# allowed by Ubuntu's ufw rules. postrm removes these rules when MoonCam is uninstalled.
+allow_wifi_through_firewall() {
+    command -v ufw >/dev/null 2>&1 || return 0
+    for net in 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16; do
+        ufw allow proto tcp from "$net" to any port 47322 comment 'MoonCam Wi-Fi' >/dev/null 2>&1 || true
+    done
+}
+
 case "$1" in
     configure)
         configure_virtual_camera
+        allow_wifi_through_firewall
         if command -v update-desktop-database >/dev/null 2>&1; then update-desktop-database -q /usr/share/applications || true; fi
         if command -v gtk-update-icon-cache >/dev/null 2>&1; then gtk-update-icon-cache -q -f /usr/share/icons/hicolor || true; fi
         ;;

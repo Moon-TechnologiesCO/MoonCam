@@ -50,8 +50,9 @@ and with the camera notification and Android's camera indicator visible the whol
 **Android 17 and later** treat the local network as a runtime permission (`ACCESS_LOCAL_NETWORK`, "Nearby
 devices"). MoonCam asks for it together with the camera; USB keeps working without it.
 
-**Firewall.** Wi-Fi needs incoming TCP 47322 on the computer. MoonCam does not change firewall rules on its
-own; if ufw is enabled, allow the port for your local network.
+**Firewall.** Wi-Fi needs incoming TCP 47322 on the computer. When ufw is installed, the package allows that
+port from private network ranges only (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16), never from the internet,
+and removes the rules when MoonCam is uninstalled. Behind the port, only paired phones get past TLS.
 
 ## Reporting vulnerabilities
 

@@ -1,7 +1,19 @@
 #!/bin/sh
 set -e
+
+remove_firewall_rules() {
+    command -v ufw >/dev/null 2>&1 || return 0
+    for net in 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16; do
+        ufw delete allow proto tcp from "$net" to any port 47322 >/dev/null 2>&1 || true
+    done
+}
+
 case "$1" in
+    remove)
+        remove_firewall_rules
+        ;;
     purge)
+        remove_firewall_rules
         rm -f /etc/modprobe.d/mooncam.conf /etc/modules-load.d/mooncam.conf
         ;;
 esac
