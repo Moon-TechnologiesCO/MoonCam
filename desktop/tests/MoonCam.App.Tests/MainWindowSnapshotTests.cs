@@ -78,6 +78,33 @@ public class MainWindowSnapshotTests
         Directory.Delete(config, recursive: true);
     }
 
+    [AvaloniaFact]
+    public void Pairing_on_a_new_network_first_asks_whether_it_is_yours()
+    {
+        var config = Directory.CreateTempSubdirectory("mooncam-ui-").FullName;
+        var monitor = new OneNetwork(new MoonCam.Core.Network.NetworkConnection("home-uuid", "TheWorldSystem5G"));
+        var networks = new MoonCam.Core.Network.NetworkTrust(monitor, new MoonCam.Infrastructure.Security.JsonTrustedNetworkStore(config), TimeProvider.System);
+        var wifi = new WiFiOptions(MoonCam.Infrastructure.Security.DesktopIdentity.LoadOrCreate(config),
+            new MoonCam.Core.Session.PairingCoordinator(new MoonCam.Infrastructure.Security.JsonPairedPhoneStore(config), TimeProvider.System),
+            Port: 0, Advertise: false, Networks: networks);
+        var (window, vm) = Open(wifi);
+
+        vm.PairOverWiFiCommand.Execute(null);
+
+        Assert.True(vm.IsTrustPromptOpen);
+        Assert.False(vm.IsPairingOpen);
+        Assert.Equal("TheWorldSystem5G", vm.TrustPromptNetwork);
+        Assert.Contains("not a trusted network", vm.WiFiStatus, StringComparison.Ordinal);
+        Save(window, "mooncam-trust-network.png");
+
+        vm.TrustNetworkAndPairCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(vm.IsTrustPromptOpen);
+        Assert.True(networks.IsWiFiAllowed);
+        Assert.Single(vm.TrustedNetworks);
+        Directory.Delete(config, recursive: true);
+    }
+
     private static (MainWindow, MainViewModel) Open(WiFiOptions? wifi = null)
     {
         var controller = new StreamController(TimeProvider.System, () => new NullDecoder(), port: 0, wifi: wifi);
@@ -112,6 +139,12 @@ public class MainWindowSnapshotTests
         data.AsSpan(yPlane, chroma).Fill(150);         // U: towards blue
         data.AsSpan(yPlane + chroma, chroma).Fill(122); // V: a little violet
         return new VideoFrame(width, height, data, 0);
+    }
+
+    private sealed class OneNetwork(MoonCam.Core.Network.NetworkConnection network) : MoonCam.Core.Network.INetworkMonitor
+    {
+        public IReadOnlyList<MoonCam.Core.Network.NetworkConnection> Current { get; } = [network];
+        public event Action? Changed { add { } remove { } }
     }
 
     private sealed class NoVirtualCameras : IVirtualCameraProvider

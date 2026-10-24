@@ -3,6 +3,7 @@ using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MoonCam.Core.Media;
+using MoonCam.Core.Network;
 using MoonCam.Core.Protocol;
 using MoonCam.Core.Session;
 using MoonCam.Core.Setup;
@@ -15,6 +16,8 @@ public sealed record CameraOption(string Id, string Label);
 public sealed record PresetOption(string Label, int Width, int Height, int Fps);
 
 public sealed record PairedPhoneOption(string Name, string FingerprintHex, string Detail);
+
+public sealed record TrustedNetworkOption(string Name, string Id, string Detail);
 
 /// <summary>
 /// State and commands of the main window. It knows nothing about Avalonia: UI-thread marshalling is
@@ -50,12 +53,20 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             pairing.Changed += () => _runOnUi(ShowPairing);
             pairing.Store.Changed += () => _runOnUi(ShowPairedPhones);
         }
+        if (_controller.Networks is { } networks)
+            networks.Changed += () => _runOnUi(ShowNetworks);
+        _controller.WiFiChanged += () => _runOnUi(() =>
+        {
+            ShowNetworks();
+            ShowState(_controller.State);
+        });
         _statsTimer = (time ?? TimeProvider.System).CreateTimer(_ => _runOnUi(UpdateStats), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
 
         RefreshSetup();
         ShowState(_controller.State);
         ShowPairing();
         ShowPairedPhones();
+        ShowNetworks();
     }
 
     public ObservableCollection<CameraOption> Cameras { get; } = [];
@@ -67,6 +78,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     public ObservableCollection<Component> SetupItems { get; } = [];
 
     public ObservableCollection<PairedPhoneOption> PairedPhones { get; } = [];
+
+    public ObservableCollection<TrustedNetworkOption> TrustedNetworks { get; } = [];
 
     /// <summary>False when the desktop runs USB-only (no Wi-Fi identity).</summary>
     public bool IsWiFiAvailable => _controller.Pairing is not null;
@@ -91,6 +104,10 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string? _pairingCode;
     [ObservableProperty] private string _pairingPhone = "";
     [ObservableProperty] private bool _hasPairedPhones;
+    [ObservableProperty] private bool _isTrustPromptOpen;
+    [ObservableProperty] private string _trustPromptNetwork = "";
+    [ObservableProperty] private string _wiFiStatus = "";
+    [ObservableProperty] private bool _hasTrustedNetworks;
 
     [RelayCommand]
     private async Task ConnectUsbAsync()
@@ -105,9 +122,45 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         }
     }
 
-    /// <summary>Opens the two-minute window in which a phone on the same Wi-Fi may pair.</summary>
+    /// <summary>
+    /// Opens the two-minute window in which a phone on the same Wi-Fi may pair. On a network the person has not
+    /// trusted yet, it first asks whether this is their network.
+    /// </summary>
     [RelayCommand]
-    private void PairOverWiFi() => _controller.Pairing?.OpenWindow();
+    private void PairOverWiFi()
+    {
+        if (_controller.Networks is { IsWiFiAllowed: false } networks)
+        {
+            if (networks.Current.Count == 0)
+            {
+                Notice = "Connect this computer to your Wi-Fi first.";
+                return;
+            }
+            TrustPromptNetwork = string.Join(" and ", networks.Untrusted.Select(n => n.Name));
+            IsTrustPromptOpen = true;
+            return;
+        }
+        _controller.Pairing?.OpenWindow();
+    }
+
+    /// <summary>The person confirmed this is their home or office network: Wi-Fi turns on here, then pairing opens.</summary>
+    [RelayCommand]
+    private void TrustNetworkAndPair()
+    {
+        IsTrustPromptOpen = false;
+        _controller.Networks?.TrustCurrent();
+        _controller.Pairing?.OpenWindow();
+    }
+
+    [RelayCommand]
+    private void CancelTrust() => IsTrustPromptOpen = false;
+
+    [RelayCommand]
+    private void ForgetNetwork(TrustedNetworkOption network)
+    {
+        _controller.Networks?.Store.Remove(network.Id);
+        Notice = $"MoonCam no longer uses Wi-Fi on {network.Name}.";
+    }
 
     [RelayCommand]
     private void CancelPairing()
@@ -226,9 +279,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         PhoneName = _controller.Phone is { } phone ? $"{phone.Manufacturer} {phone.Model}{via}" : "No phone connected";
         (StatusTitle, StatusDetail) = state switch
         {
-            ConnectionState.Listening => ("Waiting for your phone", IsWiFiAvailable
+            ConnectionState.Listening => ("Waiting for your phone", _controller.IsWiFiOn
                 ? "Open MoonCam on your phone: it connects over Wi-Fi once paired, or plug in the cable and press Connect via USB."
-                : "Plug it in with a USB cable and press Connect."),
+                : "Plug it in with a USB cable and press Connect via USB."),
             ConnectionState.Handshaking => ("Connecting…", "Checking that this is your phone."),
             ConnectionState.Connected => ("Connected", "Starting the camera…"),
             ConnectionState.Streaming => ("Live", "Your phone is streaming to this computer."),
@@ -256,6 +309,28 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             PairedPhones.Add(new PairedPhoneOption(phone.Name, phone.FingerprintHex,
                 string.Create(CultureInfo.InvariantCulture, $"Paired {phone.PairedAt.LocalDateTime:d MMM yyyy}")));
         HasPairedPhones = PairedPhones.Count > 0;
+    }
+
+    /// <summary>Whether Wi-Fi is on, on which network, and the networks the person trusts.</summary>
+    private void ShowNetworks()
+    {
+        if (_controller.Networks is not { } networks)
+            return;
+        var current = networks.Current;
+        var names = string.Join(", ", current.Select(n => n.Name));
+        WiFiStatus = current.Count == 0 ? "Wi-Fi off · this computer is not on a network"
+            : _controller.IsWiFiOn ? $"Wi-Fi on · {names}"
+            : $"Wi-Fi off on {names} · not a trusted network";
+
+        TrustedNetworks.Clear();
+        foreach (var network in networks.Store.All)
+        {
+            var detail = current.Any(n => n.Id == network.Id)
+                ? "Connected now"
+                : string.Create(CultureInfo.InvariantCulture, $"Trusted {network.TrustedAt.LocalDateTime:d MMM yyyy}");
+            TrustedNetworks.Add(new TrustedNetworkOption(network.Name, network.Id, detail));
+        }
+        HasTrustedNetworks = TrustedNetworks.Count > 0;
     }
 
     private void ShowCameras(CapabilitiesMessage capabilities)

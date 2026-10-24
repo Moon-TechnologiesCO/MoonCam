@@ -2,6 +2,7 @@ using System.Net;
 using System.Security.Cryptography.X509Certificates;
 using MoonCam.Core.Diagnostics;
 using MoonCam.Core.Media;
+using MoonCam.Core.Network;
 using MoonCam.Core.Protocol;
 using MoonCam.Core.Session;
 using MoonCam.Infrastructure.Adb;
@@ -14,8 +15,12 @@ namespace MoonCam.Infrastructure.Streaming;
 /// <summary>Live numbers for the status bar.</summary>
 public sealed record StreamStats(int Width, int Height, double FramesPerSecond, long FramesDropped, TimeSpan? RoundTrip);
 
-/// <summary>Optional Wi-Fi setup: the desktop's TLS identity and the phones it trusts.</summary>
-public sealed record WiFiOptions(X509Certificate2 Identity, PairingCoordinator Pairing, int Port = MoonLinkServer.DefaultWiFiPort, bool Advertise = true);
+/// <summary>
+/// Optional Wi-Fi setup: the desktop's TLS identity, the phones it trusts and, with <paramref name="Networks"/>,
+/// the networks it may use Wi-Fi on (null: any network, for tests and tools).
+/// </summary>
+public sealed record WiFiOptions(X509Certificate2 Identity, PairingCoordinator Pairing, int Port = MoonLinkServer.DefaultWiFiPort,
+    bool Advertise = true, NetworkTrust? Networks = null);
 
 /// <summary>
 /// The application's single entry point to streaming: it owns the MoonLink servers (USB tunnel and Wi-Fi),
@@ -33,6 +38,8 @@ public sealed class StreamController : IAsyncDisposable
     private readonly WiFiOptions? _wifi;
     private readonly List<IVideoSink> _sinks = [];
     private readonly Lock _lock = new();
+    private readonly SemaphoreSlim _wifiGate = new(1, 1);
+    private bool _disposed;
     private MoonLinkServer? _usbServer;
     private MoonLinkServer? _wifiServer;
     private AvahiAdvertiser? _advertiser;
@@ -82,6 +89,15 @@ public sealed class StreamController : IAsyncDisposable
 
     public int? WiFiPort => _wifiServer?.LocalEndpoint.Port;
 
+    /// <summary>True while the Wi-Fi server is listening (only on trusted networks when those are configured).</summary>
+    public bool IsWiFiOn => _wifiServer is not null;
+
+    /// <summary>Which networks Wi-Fi may be used on; null when Wi-Fi is off or not limited by network.</summary>
+    public NetworkTrust? Networks => _wifi?.Networks;
+
+    /// <summary>Raised when Wi-Fi turns on or off because the network changed or was trusted or forgotten.</summary>
+    public event Action? WiFiChanged;
+
     /// <summary>Wi-Fi pairing: open the window, approve or reject codes, list and remove phones.</summary>
     public PairingCoordinator? Pairing => _wifi?.Pairing;
 
@@ -104,18 +120,66 @@ public sealed class StreamController : IAsyncDisposable
             _pipeline.AddSink(sink);
 
         _usbServer = StartServer(new IPEndPoint(IPAddress.Loopback, _port), certificate: null);
-        if (_wifi is not null)
-        {
-            _wifiServer = StartServer(new IPEndPoint(IPAddress.Any, _wifi.Port), _wifi.Identity);
-            _wifiServer.HandshakeFailed += e => _log.Warn("Wi-Fi TLS handshake failed", e);
-            if (_wifi.Advertise)
-            {
-                _advertiser = new AvahiAdvertiser(_log);
-                _advertiser.Start($"MoonCam on {Environment.MachineName}", _wifiServer.LocalEndpoint.Port,
-                    Convert.ToHexStringLower(Core.Protocol.Pairing.Fingerprint(_wifi.Identity.RawData)));
-            }
-        }
+        if (IsWiFiWanted)
+            StartWiFi();
+        if (_wifi?.Networks is { } networks)
+            networks.Changed += OnNetworksChanged;
         _state.TryMoveTo(ConnectionState.Listening);
+    }
+
+    private bool IsWiFiWanted => !_disposed && _wifi is not null && (_wifi.Networks?.IsWiFiAllowed ?? true);
+
+    private void OnNetworksChanged() => _ = UpdateWiFiAsync();
+
+    /// <summary>Starts or stops Wi-Fi to match the network. Calls are serialised; the last state wins.</summary>
+    private async Task UpdateWiFiAsync()
+    {
+        bool changed;
+        await _wifiGate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            changed = IsWiFiWanted != IsWiFiOn;
+            if (IsWiFiWanted && !IsWiFiOn)
+                StartWiFi();
+            else if (!IsWiFiWanted && IsWiFiOn)
+                await StopWiFiAsync().ConfigureAwait(false);
+        }
+        catch (Exception e) when (e is IOException or System.Net.Sockets.SocketException)
+        {
+            ReportProblem("Wi-Fi could not start", e);
+            return;
+        }
+        finally
+        {
+            _wifiGate.Release();
+        }
+        if (changed)
+            WiFiChanged?.Invoke();
+    }
+
+    private void StartWiFi()
+    {
+        var wifi = _wifi!;
+        _wifiServer = StartServer(new IPEndPoint(IPAddress.Any, wifi.Port), wifi.Identity);
+        _wifiServer.HandshakeFailed += e => _log.Warn("Wi-Fi TLS handshake failed", e);
+        if (wifi.Advertise)
+        {
+            _advertiser = new AvahiAdvertiser(_log);
+            _advertiser.Start($"MoonCam on {Environment.MachineName}", _wifiServer.LocalEndpoint.Port,
+                Convert.ToHexStringLower(Core.Protocol.Pairing.Fingerprint(wifi.Identity.RawData)));
+        }
+    }
+
+    /// <summary>Stops announcing, closes pairing and ends any Wi-Fi session: this network is not trusted.</summary>
+    private async Task StopWiFiAsync()
+    {
+        _log.Info("Wi-Fi off: this computer is on a network that is not trusted");
+        _advertiser?.Dispose();
+        _advertiser = null;
+        _wifi!.Pairing.CloseWindow();
+        var server = _wifiServer!;
+        _wifiServer = null;
+        await server.DisposeAsync().ConfigureAwait(false);
     }
 
     private MoonLinkServer StartServer(IPEndPoint endpoint, X509Certificate2? certificate)
@@ -252,13 +316,24 @@ public sealed class StreamController : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        _disposed = true;
+        if (_wifi?.Networks is { } networks)
+            networks.Changed -= OnNetworksChanged;
         if (_session is { } session)
             await session.SayGoodbyeAsync("desktop closing").ConfigureAwait(false);
-        _advertiser?.Dispose();
         if (_usbServer is not null)
             await _usbServer.DisposeAsync().ConfigureAwait(false);
-        if (_wifiServer is not null)
-            await _wifiServer.DisposeAsync().ConfigureAwait(false);
+        await _wifiGate.WaitAsync().ConfigureAwait(false); // let a network change in flight finish first
+        try
+        {
+            _advertiser?.Dispose();
+            if (_wifiServer is not null)
+                await _wifiServer.DisposeAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            _wifiGate.Release();
+        }
         if (_pipeline is not null)
             await _pipeline.DisposeAsync().ConfigureAwait(false);
         DisableVirtualCamera();

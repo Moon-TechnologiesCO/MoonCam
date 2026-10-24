@@ -4,10 +4,12 @@ using Avalonia.Markup.Xaml;
 using MoonCam.App.ViewModels;
 using MoonCam.App.Views;
 using MoonCam.Infrastructure.Decoding;
+using MoonCam.Core.Network;
 using MoonCam.Core.Session;
 using MoonCam.Infrastructure.Diagnostics;
 using MoonCam.Infrastructure.Security;
 using MoonCam.Infrastructure.Streaming;
+using MoonCam.Platform.Linux.Network;
 using MoonCam.Platform.Linux.Setup;
 using MoonCam.Platform.Linux.Video;
 
@@ -30,7 +32,10 @@ public sealed class App : Application
                 e.SetObserved();
             };
             log.Info($"MoonCam {typeof(App).Assembly.GetName().Version} starting");
-            var wifi = new WiFiOptions(DesktopIdentity.LoadOrCreate(), new PairingCoordinator(new JsonPairedPhoneStore(), TimeProvider.System));
+            var networkMonitor = new NetworkManagerMonitor(log);
+            var networks = new NetworkTrust(networkMonitor, new JsonTrustedNetworkStore(), TimeProvider.System);
+            var wifi = new WiFiOptions(DesktopIdentity.LoadOrCreate(), new PairingCoordinator(new JsonPairedPhoneStore(), TimeProvider.System),
+                Networks: networks);
             var controller = new StreamController(TimeProvider.System, () => new FfmpegVideoDecoder(),
                 fixedToken: DevelopmentToken(desktop.Args), log: log, wifi: wifi);
             var setup = new LinuxSystemSetup(() => FfmpegVideoDecoder.IsAvailable);
@@ -38,7 +43,12 @@ public sealed class App : Application
             var window = new MainWindow { DataContext = viewModel };
             controller.AddSink(window.Preview);
             desktop.MainWindow = window;
-            desktop.ShutdownRequested += async (_, _) => await controller.DisposeAsync();
+            desktop.ShutdownRequested += async (_, _) =>
+            {
+                networkMonitor.Dispose();
+                await controller.DisposeAsync();
+            };
+            networkMonitor.Start();
             controller.Start();
         }
         base.OnFrameworkInitializationCompleted();

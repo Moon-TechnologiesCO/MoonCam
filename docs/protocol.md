@@ -11,7 +11,7 @@ Two transports carry the same bytes; the phone is always the client.
 | **USB** | `127.0.0.1:47321/tcp`, reached through `adb reverse` | The desktop passes a one-time token to the phone through ADB; the phone sends it back in `HELLO` |
 | **Wi-Fi** | `0.0.0.0:47322/tcp`, **TLS 1.3 only** | Both sides present a self-signed certificate (client certificate required). Each side identifies the other by the SHA-256 fingerprint of its certificate, learned once by pairing (§7) |
 
-**Discovery.** The desktop announces itself with mDNS (Avahi) as service type `_mooncam._tcp`, instance name
+**Discovery.** Only on networks the person trusts (docs/security.md), the desktop announces itself with mDNS (Avahi) as service type `_mooncam._tcp`, instance name
 `MoonCam on <hostname>`, port 47322 and TXT records `v=1` and `fp=<first 16 hex digits of its certificate
 fingerprint>`. The phone uses `fp` only to recognise computers it already paired with; the announcement is not
 trusted for anything else, because TLS proves the identity afterwards.

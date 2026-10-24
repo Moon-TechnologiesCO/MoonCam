@@ -92,6 +92,8 @@
                         <Button Classes="ghost" Margin="0,8,0,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
                                 Content="Pair over Wi-Fi" Command="{Binding PairOverWiFiCommand}"
                                 IsVisible="{Binding IsWiFiAvailable}" />
+                        <TextBlock Classes="muted" FontSize="11.5" Margin="4,8,4,0" TextWrapping="Wrap" Text="{Binding WiFiStatus}"
+                                   IsVisible="{Binding WiFiStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
 
                         <!-- Phones allowed over Wi-Fi -->
                         <StackPanel IsVisible="{Binding HasPairedPhones}">
@@ -107,6 +109,28 @@
                                                 </StackPanel>
                                                 <Button Grid.Column="1" Classes="ghost" Content="Remove" FontSize="11.5" VerticalAlignment="Center"
                                                         Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).RemovePairedPhoneCommand}"
+                                                        CommandParameter="{Binding}" />
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+
+                        <!-- Networks where Wi-Fi is allowed -->
+                        <StackPanel IsVisible="{Binding HasTrustedNetworks}">
+                            <TextBlock Classes="section" Text="TRUSTED NETWORKS" />
+                            <ItemsControl ItemsSource="{Binding TrustedNetworks}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:TrustedNetworkOption">
+                                        <Border Classes="glass" Margin="0,0,0,6" Padding="12,8">
+                                            <Grid ColumnDefinitions="*,Auto">
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Name}" FontSize="12.5" FontWeight="Medium" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Text="{Binding Detail}" Classes="muted" FontSize="11" />
+                                                </StackPanel>
+                                                <Button Grid.Column="1" Classes="ghost" Content="Forget" FontSize="11.5" VerticalAlignment="Center"
+                                                        Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).ForgetNetworkCommand}"
                                                         CommandParameter="{Binding}" />
                                             </Grid>
                                         </Border>
@@ -192,6 +216,21 @@
                                         Content="Codes match — Pair" Command="{Binding ApprovePairingCommand}" />
                             </StackPanel>
                             <Button Classes="ghost" HorizontalAlignment="Center" HorizontalContentAlignment="Center" MinWidth="120" Content="Cancel" Command="{Binding CancelPairingCommand}" />
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Trusting a network: asked once per network, before Wi-Fi is used on it -->
+                    <Grid IsVisible="{Binding IsTrustPromptOpen}" Background="#0A0D24">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12" MaxWidth="460" Margin="24">
+                            <Image Source="avares://mooncam/Assets/mooncam.png" Width="72" Height="72" />
+                            <TextBlock Classes="title" HorizontalAlignment="Center" Text="Is this your network?" />
+                            <TextBlock HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" FontSize="18" FontWeight="SemiBold"
+                                       Foreground="{StaticResource GlowBrush}" Text="{Binding TrustPromptNetwork}" />
+                            <TextBlock Classes="muted" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"
+                                       Text="MoonCam uses Wi-Fi only on networks you trust, like your home or office. On public networks (cafés, airports, hotels) it stays off and invisible; the USB cable always works." />
+                            <Button Classes="primary" HorizontalAlignment="Center" MinWidth="240" Margin="0,6,0,0"
+                                    Content="Yes, it's mine — Pair" Command="{Binding TrustNetworkAndPairCommand}" />
+                            <Button Classes="ghost" HorizontalAlignment="Center" HorizontalContentAlignment="Center" MinWidth="120" Content="Cancel" Command="{Binding CancelTrustCommand}" />
                         </StackPanel>
                     </Grid>
 

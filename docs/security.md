@@ -47,6 +47,13 @@ Removing a paired device on either side ("Remove" on the desktop, "Forget" on th
 immediately. The phone connects on its own only to a paired computer, only while MoonCam is open on screen,
 and with the camera notification and Android's camera indicator visible the whole time.
 
+**Trusted networks only.** The desktop uses Wi-Fi only while every network it is on is one the person
+trusted (home, office). The first time they pair on a network, MoonCam asks "Is this your network?" and
+remembers the answer per NetworkManager connection profile in `~/.config/mooncam/trusted-networks.json`
+(`0600`). On any other network (a café, an airport, a hotel) the Wi-Fi port is closed and nothing is announced
+on mDNS, so other people there cannot even see that MoonCam exists. Joining such a network while streaming
+over Wi-Fi ends the session at once. "Forget" under Trusted networks undoes the choice. USB always works.
+
 **Android 17 and later** treat the local network as a runtime permission (`ACCESS_LOCAL_NETWORK`, "Nearby
 devices"). MoonCam asks for it together with the camera; USB keeps working without it.
 
