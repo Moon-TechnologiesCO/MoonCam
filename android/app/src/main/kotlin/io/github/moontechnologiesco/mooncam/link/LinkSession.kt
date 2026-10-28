@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.wifi.WifiManager
 import android.os.Build
 import android.provider.Settings
+import android.util.Log
 import io.github.moontechnologiesco.mooncam.R
 import io.github.moontechnologiesco.mooncam.StreamingState
 import io.github.moontechnologiesco.mooncam.StreamingStatus
@@ -64,13 +65,16 @@ class LinkSession(private val context: Context, target: LinkTarget) {
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: RejectedException) {
+                    Log.i(TAG, "Refused by the computer: ${e.message}")
                     StreamingStatus.update(StreamingState.Rejected(e.message.orEmpty()))
                     return
                 } catch (e: IdentityChangedException) {
+                    Log.w(TAG, "The computer's certificate changed", e)
                     StreamingStatus.update(StreamingState.Failed(context.getString(R.string.identity_changed, e.computer)))
                     return
                 } catch (e: Exception) {
                     if (e !is IOException && e !is ProtocolException) throw e
+                    Log.w(TAG, "Link to ${describe(target)} failed", e)
                     if ((target as? LinkTarget.WiFi)?.isPairing == true) {
                         StreamingStatus.update(StreamingState.Failed(context.getString(R.string.pairing_interrupted)))
                         return
@@ -222,6 +226,11 @@ class LinkSession(private val context: Context, target: LinkTarget) {
         return HelloMessage(name, Build.MANUFACTURER, Build.MODEL, Build.VERSION.RELEASE, version, token, pairing)
     }
 
+    private fun describe(target: LinkTarget) = when (target) {
+        is LinkTarget.Usb -> "USB tunnel"
+        is LinkTarget.WiFi -> "${target.computer} over Wi-Fi${if (target.isPairing) " (pairing)" else ""}"
+    }
+
     /** Keeps Wi-Fi out of power saving while streaming; otherwise frames arrive in bursts. */
     private fun lowLatencyWifiLock(): WifiManager.WifiLock? =
         context.getSystemService(WifiManager::class.java)
@@ -238,6 +247,7 @@ class LinkSession(private val context: Context, target: LinkTarget) {
     }
 
     private companion object {
+        const val TAG = "MoonCam"
         const val READ_TIMEOUT_MS = 5_000
         const val INITIAL_BACKOFF_MS = 500L
         const val MAX_BACKOFF_MS = 8_000L

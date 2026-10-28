@@ -2,6 +2,7 @@ package io.github.moontechnologiesco.mooncam.link
 
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
+import android.util.Log
 import io.github.moontechnologiesco.mooncam.protocol.Pairing
 import java.math.BigInteger
 import java.net.Socket
@@ -43,6 +44,22 @@ object PhoneIdentity {
         override fun getClientAliases(keyType: String?, issuers: Array<out Principal>?) = arrayOf(ALIAS)
         override fun getServerAliases(keyType: String?, issuers: Array<out Principal>?) = emptyArray<String>()
         override fun chooseServerAlias(keyType: String?, issuers: Array<out Principal>?, socket: Socket?): String? = null
+    }
+
+    /** Diagnostics after a failed TLS handshake: can the identity key sign the way TLS asks it to? */
+    fun logSelfTest() {
+        val key = runCatching { keyStore.getKey(ALIAS, null) as PrivateKey }
+        Log.i("MoonCam", "Identity: key=${key.getOrNull()?.javaClass?.name} cert=${runCatching { certificate.sigAlgName }.getOrElse { it.toString() }}")
+        for (algorithm in listOf("NONEwithECDSA", "SHA256withECDSA")) {
+            val result = runCatching {
+                java.security.Signature.getInstance(algorithm).run {
+                    initSign(key.getOrThrow())
+                    update(ByteArray(32) { it.toByte() })
+                    sign().size
+                }
+            }
+            Log.i("MoonCam", "Identity self-test $algorithm: ${result.fold({ "ok, $it bytes" }, { Log.getStackTraceString(it) })}")
+        }
     }
 
     private fun generate() {
