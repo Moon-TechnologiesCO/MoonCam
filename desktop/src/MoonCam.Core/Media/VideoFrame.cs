@@ -30,7 +30,10 @@ public sealed class VideoFrame
     public static int SizeOf(int width, int height) => width * height * 3 / 2;
 }
 
-/// <summary>Anything that consumes decoded video: the preview, the virtual camera.</summary>
+/// <summary>
+/// Anything that consumes decoded video: the preview, the virtual camera. <see cref="Push"/> must not keep the
+/// frame after it returns: its buffer is reused for later pictures (copy what you need to keep).
+/// </summary>
 public interface IVideoSink
 {
     void Push(VideoFrame frame);
@@ -40,4 +43,14 @@ public interface IVideoSink
 public interface IVirtualCamera : IVideoSink, IDisposable
 {
     string DevicePath { get; }
+
+    /// <summary>True while another program (OBS, a browser, a call app) has the camera open.</summary>
+    bool HasReaders => false;
+
+    /// <summary>Raised when the first program opens the camera or the last one closes it.</summary>
+    event Action? ReadersChanged
+    {
+        add { }
+        remove { }
+    }
 }

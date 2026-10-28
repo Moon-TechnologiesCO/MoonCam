@@ -49,6 +49,9 @@ public static class ControlOps
     public const string PairReveal = "pairReveal";
     public const string PairConfirm = "pairConfirm";
     public const string Paired = "paired";
+
+    /// <summary>Either side: "I no longer trust you". The receiver forgets the sender too and the session ends.</summary>
+    public const string Unpair = "unpair";
 }
 
 /// <summary>A command or event. Fields that do not apply to an operation stay null and are not serialised.</summary>

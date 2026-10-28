@@ -40,6 +40,9 @@ import java.util.Base64
 /** The desktop refused this phone (wrong or expired token, not paired, pairing cancelled). Retrying would not help. */
 class RejectedException(reason: String) : Exception(reason)
 
+/** The desktop said goodbye on purpose (Disconnect, unpair, MoonCam closing): the phone stops instead of reconnecting. */
+class DisconnectedException(val computer: String, val unpaired: Boolean) : Exception("Disconnected by $computer")
+
 /**
  * One phone-to-desktop link, over the adb tunnel or over Wi-Fi: handshake, pairing when the computer is new,
  * capabilities, then commands from the desktop while the camera streams. Reconnects with exponential back-off
@@ -53,9 +56,17 @@ class LinkSession(private val context: Context, target: LinkTarget) {
     /** Set while a pairing code is on screen, so [confirmPairing] can answer from another thread. */
     @Volatile private var pairingWriter: FrameWriter? = null
 
+    /** Set while linked, so [unpair] can speak from another thread. */
+    @Volatile private var linkWriter: FrameWriter? = null
+
+    /** Held only while video streams over Wi-Fi; a resting camera lets Wi-Fi save power. */
+    private val wifiLock: WifiManager.WifiLock? = if (target is LinkTarget.WiFi) lowLatencyWifiLock() else null
+
+    /** The paired computer this link pins, if it is a Wi-Fi link. */
+    val wifiFingerprint: String? get() = (target as? LinkTarget.WiFi)?.desktopFingerprintHex
+
     suspend fun runWithReconnect() {
         var backoffMs = INITIAL_BACKOFF_MS
-        val wifiLock = if (target is LinkTarget.WiFi) lowLatencyWifiLock() else null
         try {
             while (true) {
                 currentCoroutineContext().ensureActive()
@@ -67,6 +78,10 @@ class LinkSession(private val context: Context, target: LinkTarget) {
                 } catch (e: RejectedException) {
                     Log.i(TAG, "Refused by the computer: ${e.message}")
                     StreamingStatus.update(StreamingState.Rejected(e.message.orEmpty()))
+                    return
+                } catch (e: DisconnectedException) {
+                    Log.i(TAG, "${e.computer} ended the connection${if (e.unpaired) " and unpaired this phone" else ""}")
+                    StreamingStatus.update(StreamingState.Disconnected(e.computer, e.unpaired))
                     return
                 } catch (e: IdentityChangedException) {
                     Log.w(TAG, "The computer's certificate changed", e)
@@ -86,7 +101,17 @@ class LinkSession(private val context: Context, target: LinkTarget) {
                 backoffMs = (backoffMs * 2).coerceAtMost(MAX_BACKOFF_MS)
             }
         } finally {
-            wifiLock?.release()
+            if (wifiLock?.isHeld == true) wifiLock.release()
+            StreamingStatus.linkedOverWifi(null)
+        }
+    }
+
+    /** The person unpaired this computer here: tell it, so it forgets this phone too, then it says goodbye. */
+    fun unpair() {
+        try {
+            linkWriter?.write(Messages.control(ControlMessage(ControlOps.UNPAIR)))
+        } catch (_: IOException) {
+            // The connection is gone; the computer still lists the phone until it is unpaired there too.
         }
     }
 
@@ -134,22 +159,36 @@ class LinkSession(private val context: Context, target: LinkTarget) {
             pair(wifi, connection.desktopFingerprint!!, welcome.serverName, reader, writer)
         }
         StreamingStatus.update(StreamingState.Connected(welcome.serverName))
+        val pinned = (this.target as? LinkTarget.WiFi)?.desktopFingerprintHex
+        StreamingStatus.linkedOverWifi(pinned)
 
         val catalog = CameraCatalog(context)
         writer.write(Messages.capabilities(CapabilitiesMessage(catalog.list())))
         val streamer = CameraStreamer(context, catalog, writer, Listener(welcome.serverName, socket))
+        linkWriter = writer
+        var unpaired = false
         try {
             while (true) {
                 val frame = reader.read() ?: break
                 when (frame.type) {
                     FrameType.PING -> writer.write(Heartbeat.pong(frame))
-                    FrameType.CONTROL -> handle(Messages.readControl(frame), streamer, welcome.serverName)
-                    FrameType.BYE -> break
+                    FrameType.CONTROL -> {
+                        val message = Messages.readControl(frame)
+                        if (message.op == ControlOps.UNPAIR && pinned != null) {
+                            paired.remove(pinned) // the computer no longer trusts this phone: forget it here too
+                            unpaired = true
+                        } else {
+                            handle(message, streamer, welcome.serverName)
+                        }
+                    }
+                    FrameType.BYE -> throw DisconnectedException(welcome.serverName, unpaired || Messages.readBye(frame).reason == "unpaired")
                     else -> Unit // nothing else is meant for the phone; ignore politely
                 }
             }
         } finally {
+            linkWriter = null
             streamer.release()
+            if (wifiLock?.isHeld == true) wifiLock.release()
         }
     }
 
@@ -208,10 +247,13 @@ class LinkSession(private val context: Context, target: LinkTarget) {
                         bitrateBps = (message.bitrateBps ?: 3_000_000).coerceIn(250_000, 40_000_000),
                     ),
                 )
+                if (wifiLock?.isHeld == false) wifiLock.acquire()
                 StreamingStatus.update(StreamingState.Streaming(computer))
             }
             ControlOps.STOP -> {
+                // Nobody is watching on the computer: the camera and encoder close, the phone cools down.
                 streamer.stop()
+                if (wifiLock?.isHeld == true) wifiLock.release()
                 StreamingStatus.update(StreamingState.Connected(computer))
             }
             ControlOps.KEY_FRAME -> streamer.requestKeyFrame()
@@ -235,10 +277,7 @@ class LinkSession(private val context: Context, target: LinkTarget) {
     private fun lowLatencyWifiLock(): WifiManager.WifiLock? =
         context.getSystemService(WifiManager::class.java)
             ?.createWifiLock(WifiManager.WIFI_MODE_FULL_LOW_LATENCY, "MoonCam:stream")
-            ?.apply {
-                setReferenceCounted(false)
-                acquire()
-            }
+            ?.apply { setReferenceCounted(false) }
 
     private class Listener(private val computer: String, private val socket: Socket) : StreamerListener {
         override fun onCameraBusy() = StreamingStatus.update(StreamingState.CameraBusy)

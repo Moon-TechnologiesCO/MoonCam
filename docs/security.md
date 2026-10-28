@@ -43,8 +43,8 @@ A webcam app sees your face and hears your room. MoonCam treats that seriously.
    the stored computer fingerprint. If the computer presents another certificate (for example after MoonCam
    was reinstalled on it), the phone stops and asks the person to forget it and pair again.
 
-Removing a paired device on either side ("Remove" on the desktop, "Forget" on the phone) revokes it
-immediately. The phone connects on its own only to a paired computer, only while MoonCam is open on screen,
+Unpairing on either side ("Unpair" on the desktop or on the phone) revokes it immediately; if the two are
+connected at that moment, the other side is told (`unpair`) and forgets too. The phone connects on its own only to a paired computer, only while MoonCam is open on screen,
 and with the camera notification and Android's camera indicator visible the whole time.
 
 **Trusted networks only.** The desktop uses Wi-Fi only while every network it is on is one the person

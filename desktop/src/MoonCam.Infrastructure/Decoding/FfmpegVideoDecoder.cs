@@ -15,6 +15,7 @@ public sealed unsafe class FfmpegVideoDecoder : IVideoDecoder
     private IntPtr _frame;
     private byte[] _codecData = [];
     private readonly Queue<long> _timestamps = new();
+    private readonly Stack<byte[]> _freeBuffers = new(); // a 1080p picture is 3 MB: reuse instead of allocating 30 per second
 
     public static bool IsAvailable => FfmpegNative.IsAvailable();
 
@@ -72,13 +73,31 @@ public sealed unsafe class FfmpegVideoDecoder : IVideoDecoder
         return pictures;
     }
 
-    private static VideoFrame CopyToI420(AvFrameHead* frame, long timestampUs)
+    public void Recycle(VideoFrame frame)
+    {
+        if (_freeBuffers.Count < MaxFreeBuffers)
+            _freeBuffers.Push(frame.Data);
+    }
+
+    private const int MaxFreeBuffers = 3;
+
+    private byte[] RentBuffer(int size)
+    {
+        while (_freeBuffers.TryPop(out var buffer))
+        {
+            if (buffer.Length == size)
+                return buffer;
+        }
+        return GC.AllocateUninitializedArray<byte>(size); // every byte is written below
+    }
+
+    private VideoFrame CopyToI420(AvFrameHead* frame, long timestampUs)
     {
         if (frame->Format is not (PixelFormatYuv420P or PixelFormatYuvj420P))
             throw new NotSupportedException($"Unsupported decoder pixel format {frame->Format}.");
 
         int width = frame->Width & ~1, height = frame->Height & ~1;
-        var data = new byte[VideoFrame.SizeOf(width, height)];
+        var data = RentBuffer(VideoFrame.SizeOf(width, height));
         var offset = 0;
         for (var plane = 0; plane < 3; plane++)
         {

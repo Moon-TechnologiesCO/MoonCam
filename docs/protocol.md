@@ -122,6 +122,14 @@ sequenceDiagram
   D->>P: BYE
 ```
 
+**Video on demand:** the desktop sends `start` only while someone can see the picture (the MoonCam window is
+on screen, or another app has the virtual camera open) and `stop` about 4 seconds after the last viewer leaves.
+The phone closes its camera and encoder on `stop`, so neither device works while nobody watches; the session
+itself stays open and resumes in about a second.
+
+**Goodbye is final:** a `BYE` from the desktop (Disconnect, unpair, or MoonCam closing) ends the link for good:
+the phone does not reconnect on its own. A connection that simply drops (Wi-Fi lost, cable pulled) is retried.
+
 **Liveness:** the desktop sends `PING` every second. If either side receives nothing for **3 seconds** it
 considers the connection lost. The phone reconnects with exponential back-off (0.5 s doubling to 8 s).
 
@@ -140,6 +148,7 @@ considers the connection lost. The phone reconnects with exponential back-off (0
 | `pairReveal` | phone → desktop | `data` = base64 phone nonce | pairing step 3; must match the commitment |
 | `pairConfirm` | phone → desktop | — | the person on the phone saw the same code |
 | `paired` | desktop → phone | `message` = computer name | both people confirmed; the phone is trusted from now on |
+| `unpair` | either way | — | the sender no longer trusts the receiver; the receiver forgets the sender too, then the desktop says `BYE` |
 
 Unknown `op` values are ignored (forward compatibility); unknown frame **types** are not.
 

@@ -41,6 +41,12 @@ class StreamingService : LifecycleService() {
                 session?.let { lifecycleScope.launch(Dispatchers.IO) { it.confirmPairing() } } ?: stopSelf()
                 return START_NOT_STICKY
             }
+            ACTION_UNPAIR -> {
+                val fingerprint = intent.getStringExtra(EXTRA_FINGERPRINT)
+                session?.takeIf { it.wifiFingerprint == fingerprint }?.let { lifecycleScope.launch(Dispatchers.IO) { it.unpair() } }
+                    ?: run { if (link == null) stopSelf() }
+                return START_NOT_STICKY
+            }
         }
         val target = intent?.let { targetFrom(it) }
         if (target == null) {
@@ -101,6 +107,7 @@ class StreamingService : LifecycleService() {
     companion object {
         private const val ACTION_STOP = "io.github.moontechnologiesco.mooncam.action.STOP"
         private const val ACTION_CONFIRM_PAIRING = "io.github.moontechnologiesco.mooncam.action.CONFIRM_PAIRING"
+        private const val ACTION_UNPAIR = "io.github.moontechnologiesco.mooncam.action.UNPAIR"
         private const val EXTRA_TOKEN = "token"
         private const val EXTRA_PORT = "port"
         private const val EXTRA_HOST = "host"
@@ -126,6 +133,14 @@ class StreamingService : LifecycleService() {
         /** The person saw the same pairing code on both screens. */
         fun confirmPairing(context: Context) {
             context.startService(Intent(context, StreamingService::class.java).setAction(ACTION_CONFIRM_PAIRING))
+        }
+
+        /** The person unpaired a computer: if the phone is linked to it right now, the computer is told too. */
+        fun unpair(context: Context, fingerprintHex: String) {
+            if (StreamingStatus.wifiComputer.value != fingerprintHex) return
+            context.startService(
+                Intent(context, StreamingService::class.java).setAction(ACTION_UNPAIR).putExtra(EXTRA_FINGERPRINT, fingerprintHex),
+            )
         }
 
         fun stop(context: Context) {

@@ -19,7 +19,26 @@ public sealed partial class MainWindow : Window
         ZoomButton.Click += (_, _) => ToggleZoom();
         TitleBar.PointerPressed += OnTitleBarPressed;
         PointerPressed += OnWindowEdgePressed;
-        Opened += (_, _) => FitToScreen();
+        Opened += (_, _) =>
+        {
+            FitToScreen();
+            ShowPreviewIfVisible();
+        };
+        PropertyChanged += (_, e) =>
+        {
+            if (e.Property == WindowStateProperty)
+                ShowPreviewIfVisible();
+        };
+        PreviewFrame.SizeChanged += (_, e) =>
+            Preview.SetTargetSize((int)(e.NewSize.Width * RenderScaling), (int)(e.NewSize.Height * RenderScaling));
+    }
+
+    /// <summary>A minimised window shows nothing: stop converting frames, and let the phone rest if nobody else watches.</summary>
+    private void ShowPreviewIfVisible()
+    {
+        var shown = WindowState != WindowState.Minimized;
+        Preview.IsShown = shown;
+        (DataContext as MainViewModel)?.SetPreviewShown(shown);
     }
 
     /// <summary>Receives decoded frames and paints them; registered as a sink by the composition root.</summary>

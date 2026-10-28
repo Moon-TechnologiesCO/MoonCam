@@ -66,6 +66,23 @@ public class MediaTests
     }
 
     [Fact]
+    public void A_shrunk_preview_averages_each_block_of_luma()
+    {
+        // 4×4 picture: the top-left 2×2 block is white, the rest black; chroma neutral.
+        var data = new byte[VideoFrame.SizeOf(4, 4)];
+        data.AsSpan(0, 16).Fill(16);
+        data[0] = data[1] = data[4] = data[5] = 235;
+        data.AsSpan(16).Fill(128);
+        var bgra = new byte[2 * 2 * 4];
+
+        I420Converter.ToBgra(new VideoFrame(4, 4, data, 0), bgra, 8, factor: 2);
+
+        Assert.Equal([255, 255, 255, 255], bgra[..4]);   // the white block
+        Assert.Equal([0, 0, 0, 255], bgra[4..8]);        // its black neighbour
+        Assert.Equal([0, 0, 0, 255], bgra[12..16]);
+    }
+
+    [Fact]
     public void Video_frame_rejects_wrong_buffer_sizes()
     {
         Assert.Throws<ArgumentException>(() => new VideoFrame(4, 4, new byte[10], 0));

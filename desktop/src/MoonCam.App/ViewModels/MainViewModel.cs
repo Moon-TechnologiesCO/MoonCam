@@ -48,6 +48,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _controller.StateChanged += state => _runOnUi(() => ShowState(state));
         _controller.CapabilitiesChanged += caps => _runOnUi(() => ShowCameras(caps));
         _controller.Notice += text => _runOnUi(() => Notice = text);
+        _controller.VideoDemandChanged += () => _runOnUi(() => ShowState(_controller.State));
         if (_controller.Pairing is { } pairing)
         {
             pairing.Changed += () => _runOnUi(ShowPairing);
@@ -89,6 +90,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string _phoneName = "No phone connected";
     [ObservableProperty] private bool _isLive;
     [ObservableProperty] private bool _isWaiting = true;
+    [ObservableProperty] private bool _isPhoneConnected;
     [ObservableProperty] private string? _notice;
     [ObservableProperty] private string _statsText = "";
     [ObservableProperty] private CameraOption? _selectedCamera;
@@ -121,6 +123,17 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             Notice = e.Message;
         }
     }
+
+    /// <summary>Ends the connection; the phone stops its camera and does not reconnect until asked again.</summary>
+    [RelayCommand]
+    private async Task DisconnectAsync()
+    {
+        await _controller.DisconnectAsync();
+        Notice = "Phone disconnected.";
+    }
+
+    /// <summary>The window reports whether the preview is on screen; with nobody watching, the phone's camera rests.</summary>
+    public void SetPreviewShown(bool shown) => _controller.SetPreviewShown(shown);
 
     /// <summary>
     /// Opens the two-minute window in which a phone on the same Wi-Fi may pair. On a network the person has not
@@ -177,11 +190,12 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             Notice = "Codes confirmed. Waiting for the phone to confirm too…";
     }
 
+    /// <summary>Stops trusting the phone; if it is connected, it is told to forget this computer too.</summary>
     [RelayCommand]
-    private void RemovePairedPhone(PairedPhoneOption phone)
+    private async Task UnpairPhoneAsync(PairedPhoneOption phone)
     {
-        _controller.Pairing?.Store.Remove(phone.FingerprintHex);
-        Notice = $"{phone.Name} can no longer connect over Wi-Fi.";
+        await _controller.UnpairAsync(phone.FingerprintHex);
+        Notice = $"{phone.Name} is unpaired and can no longer connect over Wi-Fi.";
     }
 
     [RelayCommand]
@@ -275,6 +289,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         IsLive = state == ConnectionState.Streaming;
         IsWaiting = state is ConnectionState.Listening or ConnectionState.Reconnecting or ConnectionState.Stopped or ConnectionState.Handshaking;
+        IsPhoneConnected = state is ConnectionState.Connected or ConnectionState.Streaming;
         var via = _controller.CurrentTransport switch { Transport.WiFi => " · Wi-Fi", Transport.Usb => " · USB", _ => "" };
         PhoneName = _controller.Phone is { } phone ? $"{phone.Manufacturer} {phone.Model}{via}" : "No phone connected";
         (StatusTitle, StatusDetail) = state switch
@@ -283,6 +298,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
                 ? "Open MoonCam on your phone: it connects over Wi-Fi once paired, or plug in the cable and press Connect via USB."
                 : "Plug it in with a USB cable and press Connect via USB."),
             ConnectionState.Handshaking => ("Connecting…", "Checking that this is your phone."),
+            ConnectionState.Connected when _controller.IsVideoPaused => ("Camera resting",
+                "Nobody is watching, so the phone's camera is off to save power. It turns on by itself when you open this window or an app uses the MoonCam camera."),
             ConnectionState.Connected => ("Connected", "Starting the camera…"),
             ConnectionState.Streaming => ("Live", "Your phone is streaming to this computer."),
             ConnectionState.Reconnecting => ("Reconnecting…", "The connection dropped. MoonCam is waiting for your phone to come back."),

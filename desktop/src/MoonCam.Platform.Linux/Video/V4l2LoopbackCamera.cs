@@ -12,23 +12,55 @@ public sealed record LoopbackDevice(string Path, string Card);
 /// When the phone's resolution changes, the device format follows it — unless an app (OBS, Zoom…) is reading
 /// the camera: Linux then locks the format, so frames are scaled to the locked size instead. The app never
 /// sees the camera disappear or change under its feet.
+///
+/// The camera is listed in apps even before the phone sends video (a first placeholder picture makes it
+/// visible), and while an app reads it without live video (the phone's camera is starting, or the phone left)
+/// a calm placeholder keeps flowing a few times per second, so apps never time out or freeze.
 /// </summary>
 public sealed unsafe class V4l2LoopbackCamera : IVirtualCamera
 {
     private const string LoopbackDriver = "v4l2 loopback";
+    private const int DefaultWidth = 1280;
+    private const int DefaultHeight = 720;
+    private static readonly TimeSpan KeepAliveEvery = TimeSpan.FromMilliseconds(250);
+    private const long LiveVideoTimeoutMs = 700;
 
     private readonly Lock _lock = new();
+    private readonly DeviceReaders _readers;
+    private readonly Timer _keepAlive;
     private int _fd;
     private (int Width, int Height) _format;
+    private long _lastLiveWriteMs;
+    private VideoFrame? _placeholder;
 
     private V4l2LoopbackCamera(string devicePath, int fd)
     {
         DevicePath = devicePath;
         _fd = fd;
         _format = ReadFormat();
+        lock (_lock)
+        {
+            try
+            {
+                if (_format == (0, 0))
+                    TrySetFormat(DefaultWidth, DefaultHeight);
+                WritePlaceholder(); // makes the camera appear in apps right away
+            }
+            catch (IOException)
+            {
+                // Best effort: the first live frame sets the format instead, as before.
+            }
+        }
+        _readers = new DeviceReaders(devicePath);
+        _readers.Changed += () => ReadersChanged?.Invoke();
+        _keepAlive = new Timer(_ => KeepAlive(), null, KeepAliveEvery, KeepAliveEvery);
     }
 
     public string DevicePath { get; }
+
+    public bool HasReaders => _readers.Any;
+
+    public event Action? ReadersChanged;
 
     /// <summary>Lists v4l2loopback devices, e.g. the one created with card_label="MoonCam".</summary>
     public static IReadOnlyList<LoopbackDevice> FindDevices()
@@ -75,13 +107,55 @@ public sealed unsafe class V4l2LoopbackCamera : IVirtualCamera
                 return;
             if (_format != (frame.Width, frame.Height) && !TrySetFormat(frame.Width, frame.Height))
                 frame = I420Scaler.Scale(frame, _format.Width, _format.Height);
+            Write(frame);
+            _lastLiveWriteMs = Environment.TickCount64;
+        }
+    }
 
-            fixed (byte* data = frame.Data)
+    /// <summary>While an app reads the camera without live video, a placeholder keeps the picture flowing.</summary>
+    private void KeepAlive()
+    {
+        if (!_readers.Any)
+            return;
+        lock (_lock)
+        {
+            if (_fd < 0 || Environment.TickCount64 - _lastLiveWriteMs < LiveVideoTimeoutMs)
+                return;
+            try
             {
-                // v4l2loopback takes a whole frame per write(); a short write means the device is gone.
-                if (V4l2.write(_fd, data, (nuint)frame.Data.Length) != frame.Data.Length)
-                    throw new IOException($"Writing to {DevicePath} failed (errno {Marshal.GetLastPInvokeError()}).");
+                WritePlaceholder();
             }
+            catch (IOException)
+            {
+                // The device went away; Push reports it when live video comes back.
+            }
+        }
+    }
+
+    /// <summary>MoonCam's night blue, in the device's current size.</summary>
+    private void WritePlaceholder()
+    {
+        if (_format is not { Width: > 0, Height: > 0 } format)
+            return;
+        if (_placeholder is not { } placeholder || (placeholder.Width, placeholder.Height) != format)
+        {
+            var data = new byte[VideoFrame.SizeOf(format.Width, format.Height)];
+            int luma = format.Width * format.Height, chroma = luma / 4;
+            data.AsSpan(0, luma).Fill(36);              // #101633 in BT.601 video range
+            data.AsSpan(luma, chroma).Fill(142);
+            data.AsSpan(luma + chroma, chroma).Fill(123);
+            _placeholder = placeholder = new VideoFrame(format.Width, format.Height, data, 0);
+        }
+        Write(placeholder);
+    }
+
+    private void Write(VideoFrame frame)
+    {
+        fixed (byte* data = frame.Data)
+        {
+            // v4l2loopback takes a whole frame per write(); a short write means the device is gone.
+            if (V4l2.write(_fd, data, (nuint)frame.Data.Length) != frame.Data.Length)
+                throw new IOException($"Writing to {DevicePath} failed (errno {Marshal.GetLastPInvokeError()}).");
         }
     }
 
@@ -118,6 +192,8 @@ public sealed unsafe class V4l2LoopbackCamera : IVirtualCamera
 
     public void Dispose()
     {
+        _keepAlive.Dispose();
+        _readers.Dispose();
         lock (_lock)
         {
             if (_fd >= 0)

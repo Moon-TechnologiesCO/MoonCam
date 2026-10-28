@@ -23,14 +23,26 @@ sealed interface StreamingState {
     /** The phone gave up on its own, for a reason retrying would not fix. [message] is ready to show. */
     data class Failed(val message: String) : StreamingState
 
+    /** The computer ended the connection (Disconnect, or MoonCam closed there). [unpaired] when it also forgot this phone. */
+    data class Disconnected(val computer: String, val unpaired: Boolean = false) : StreamingState
+
     /** Something is running, so the screen offers Stop instead of ways to connect. */
-    val isActive: Boolean get() = this !is Idle && this !is Rejected && this !is Failed
+    val isActive: Boolean get() = this !is Idle && this !is Rejected && this !is Failed && this !is Disconnected
 }
 
 /** Single source of truth for the streaming state, shared by the service and the UI. */
 object StreamingStatus {
     private val mutableState = MutableStateFlow<StreamingState>(StreamingState.Idle)
     val state: StateFlow<StreamingState> = mutableState.asStateFlow()
+
+    private val mutableWifiComputer = MutableStateFlow<String?>(null)
+
+    /** Fingerprint of the paired computer linked over Wi-Fi right now (null over USB or when not linked). */
+    val wifiComputer: StateFlow<String?> = mutableWifiComputer.asStateFlow()
+
+    internal fun linkedOverWifi(fingerprintHex: String?) {
+        mutableWifiComputer.value = fingerprintHex
+    }
 
     internal fun update(state: StreamingState) {
         mutableState.value = state

@@ -100,6 +100,45 @@ public sealed class WiFiPairingTests : IAsyncDisposable
         Assert.True((await again.HelloAsync(pairing: true)).Accepted);
     }
 
+    [Fact]
+    public async Task Unpairing_on_the_computer_tells_the_connected_phone_and_disconnects_it()
+    {
+        await using var phone = await PairAsync();
+        var fingerprint = Convert.ToHexStringLower(Pairing.Fingerprint(_phoneCertificate.RawData));
+
+        await _controller.UnpairAsync(fingerprint);
+
+        Assert.Equal(ControlOps.Unpair, Messages.ReadControl(await phone.ReadUntilAsync(FrameType.Control)).Op);
+        Assert.Equal("unpaired", Messages.ReadBye(await phone.ReadUntilAsync(FrameType.Bye)).Reason);
+        Assert.Empty(_controller.Pairing!.Store.All);
+    }
+
+    [Fact]
+    public async Task A_phone_that_unpairs_itself_is_forgotten_by_the_computer()
+    {
+        await using var phone = await PairAsync();
+
+        await phone.SendAsync(new ControlMessage(ControlOps.Unpair));
+
+        Assert.Equal("unpaired", Messages.ReadBye(await phone.ReadUntilAsync(FrameType.Bye)).Reason);
+        await WaitAsync(() => _controller.Pairing!.Store.All.Count == 0 ? "forgotten" : null);
+    }
+
+    /// <summary>A phone that has just paired and stays connected.</summary>
+    private async Task<WiFiPhone> PairAsync()
+    {
+        var pairing = _controller.Pairing!;
+        pairing.OpenWindow();
+        var phone = await WiFiPhone.ConnectAsync(_controller.WiFiPort!.Value, _phoneCertificate);
+        Assert.True((await phone.HelloAsync(pairing: true)).Accepted);
+        await phone.RunPairingAsync();
+        await WaitAsync(() => pairing.Pending?.Code);
+        await phone.SendAsync(new ControlMessage(ControlOps.PairConfirm));
+        await WaitAsync(() => pairing.Pending is null ? null : (pairing.ApprovePending() ? "ok" : null));
+        Assert.Equal(ControlOps.Paired, Messages.ReadControl(await phone.ReadUntilAsync(FrameType.Control)).Op);
+        return phone;
+    }
+
     private static async Task<string> WaitAsync(Func<string?> probe)
     {
         for (var i = 0; i < 200; i++)

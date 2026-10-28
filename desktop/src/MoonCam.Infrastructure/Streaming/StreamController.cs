@@ -39,6 +39,10 @@ public sealed class StreamController : IAsyncDisposable
     private readonly List<IVideoSink> _sinks = [];
     private readonly Lock _lock = new();
     private readonly SemaphoreSlim _wifiGate = new(1, 1);
+    private readonly Lock _demandLock = new();
+    private volatile bool _previewShown = true;
+    private bool _videoRequested;
+    private ITimer? _pauseTimer;
     private bool _disposed;
     private MoonLinkServer? _usbServer;
     private MoonLinkServer? _wifiServer;
@@ -108,6 +112,112 @@ public sealed class StreamController : IAsyncDisposable
     /// <summary>Human-readable problems and phone status messages for the UI.</summary>
     public event Action<string>? Notice;
 
+    /// <summary>How long video keeps flowing after the last viewer leaves, so a quick minimise does not restart the camera.</summary>
+    public static readonly TimeSpan PauseGrace = TimeSpan.FromSeconds(4);
+
+    /// <summary>A phone is connected but its camera is off because nobody is watching (saves both devices' power).</summary>
+    public bool IsVideoPaused
+    {
+        get
+        {
+            lock (_demandLock)
+                return _session?.Handler is Handler { MediaAllowed: true } && !_videoRequested;
+        }
+    }
+
+    /// <summary>Raised when video is paused or resumed because viewers came or went.</summary>
+    public event Action? VideoDemandChanged;
+
+    /// <summary>
+    /// Video is wanted only while someone can see it: the preview is on screen, or another app has the virtual
+    /// camera open. Otherwise the phone turns its camera off and nothing is decoded.
+    /// </summary>
+    private bool IsVideoWanted => _previewShown || _virtualCamera?.HasReaders == true;
+
+    /// <summary>The window tells whether the preview is on screen (false while minimised).</summary>
+    public void SetPreviewShown(bool shown)
+    {
+        _previewShown = shown;
+        UpdateVideoDemand();
+    }
+
+    /// <summary>Starts the phone's camera as soon as someone watches; stops it a few seconds after the last viewer leaves.</summary>
+    private void UpdateVideoDemand()
+    {
+        ControlMessage? command = null;
+        lock (_demandLock)
+        {
+            if (_session?.Handler is not Handler { MediaAllowed: true })
+                return;
+            if (IsVideoWanted)
+            {
+                _pauseTimer?.Dispose();
+                _pauseTimer = null;
+                if (!_videoRequested)
+                {
+                    _videoRequested = true;
+                    command = _settings.ToStartCommand();
+                }
+            }
+            else if (_videoRequested && _pauseTimer is null)
+            {
+                _pauseTimer = _time.CreateTimer(_ => PauseVideo(), null, PauseGrace, Timeout.InfiniteTimeSpan);
+            }
+        }
+        if (command is null)
+            return;
+        _log.Info("Someone is watching: starting the phone's camera");
+        _ = SendAsync(command);
+        VideoDemandChanged?.Invoke();
+    }
+
+    private void PauseVideo()
+    {
+        lock (_demandLock)
+        {
+            _pauseTimer?.Dispose();
+            _pauseTimer = null;
+            if (IsVideoWanted || !_videoRequested || _session?.Handler is not Handler { MediaAllowed: true })
+                return;
+            _videoRequested = false;
+        }
+        _log.Info("Nobody is watching: pausing the phone's camera");
+        _ = SendAsync(new ControlMessage(ControlOps.Stop));
+        _state.TryMoveTo(ConnectionState.Connected);
+        VideoDemandChanged?.Invoke();
+    }
+
+    private void ResetVideoDemand()
+    {
+        lock (_demandLock)
+        {
+            _pauseTimer?.Dispose();
+            _pauseTimer = null;
+            _videoRequested = false;
+        }
+    }
+
+    /// <summary>Ends the connection from this computer. The phone stops and does not reconnect on its own.</summary>
+    public async Task DisconnectAsync(string reason = "disconnected")
+    {
+        if (_session is not { } session)
+            return;
+        _log.Info($"Disconnecting the phone ({reason})");
+        await session.SayGoodbyeAsync(reason).ConfigureAwait(false);
+        session.End();
+    }
+
+    /// <summary>Stops trusting a phone. If it is connected now, it is told to forget this computer and disconnected.</summary>
+    public async Task UnpairAsync(string fingerprintHex)
+    {
+        Pairing?.Store.Remove(fingerprintHex);
+        if (_session is { Handler: Handler { Info.PeerFingerprint: { } peer } } session && Convert.ToHexStringLower(peer) == fingerprintHex)
+        {
+            await SendAsync(session, new ControlMessage(ControlOps.Unpair)).ConfigureAwait(false);
+            await DisconnectAsync("unpaired").ConfigureAwait(false);
+        }
+    }
+
     /// <summary>Starts listening: 127.0.0.1 for the USB tunnel and, if configured, the LAN for Wi-Fi.</summary>
     public void Start()
     {
@@ -119,9 +229,26 @@ public sealed class StreamController : IAsyncDisposable
         foreach (var sink in _sinks)
             _pipeline.AddSink(sink);
 
-        _usbServer = StartServer(new IPEndPoint(IPAddress.Loopback, _port), certificate: null);
+        try
+        {
+            _usbServer = StartServer(new IPEndPoint(IPAddress.Loopback, _port), certificate: null);
+        }
+        catch (System.Net.Sockets.SocketException e)
+        {
+            ReportProblem($"USB connections are unavailable: another program is using port {_port}", e);
+        }
         if (IsWiFiWanted)
-            StartWiFi();
+        {
+            try
+            {
+                StartWiFi();
+            }
+            catch (System.Net.Sockets.SocketException e)
+            {
+                _wifiServer = null;
+                ReportProblem("Wi-Fi is unavailable: another program is using its port", e);
+            }
+        }
         if (_wifi?.Networks is { } networks)
             networks.Changed += OnNetworksChanged;
         _state.TryMoveTo(ConnectionState.Listening);
@@ -233,7 +360,10 @@ public sealed class StreamController : IAsyncDisposable
             throw new ArgumentException(string.Join(" ", errors), nameof(settings));
         _settings = settings;
         _log.Info($"Settings: camera {settings.CameraId}, {settings.Width}x{settings.Height} @ {settings.Fps} fps, {settings.Quality}");
-        if (_session?.Handler is Handler { MediaAllowed: true })
+        bool streaming;
+        lock (_demandLock)
+            streaming = _videoRequested && _session?.Handler is Handler { MediaAllowed: true };
+        if (streaming) // a paused camera picks the new settings up when it resumes
             await SendAsync(settings.ToStartCommand()).ConfigureAwait(false);
     }
 
@@ -242,19 +372,29 @@ public sealed class StreamController : IAsyncDisposable
     {
         DisableVirtualCamera();
         _virtualCamera = camera;
+        camera.ReadersChanged += OnVirtualCameraReadersChanged;
         AddSink(camera);
         _log.Info($"Virtual camera on: {camera.DevicePath}");
+        UpdateVideoDemand();
+    }
+
+    private void OnVirtualCameraReadersChanged()
+    {
+        _log.Info(_virtualCamera?.HasReaders == true ? "An app opened the MoonCam camera" : "No app is using the MoonCam camera");
+        UpdateVideoDemand();
     }
 
     public void DisableVirtualCamera()
     {
         if (_virtualCamera is null)
             return;
+        _virtualCamera.ReadersChanged -= OnVirtualCameraReadersChanged;
         _pipeline?.RemoveSink(_virtualCamera);
         lock (_lock)
             _sinks.Remove(_virtualCamera);
         _virtualCamera.Dispose();
         _virtualCamera = null;
+        UpdateVideoDemand();
     }
 
     public StreamStats GetStats()
@@ -305,6 +445,7 @@ public sealed class StreamController : IAsyncDisposable
             return;
         }
         _videoConfig = null;
+        ResetVideoDemand();
         var next = end.Reason is SessionEndReason.TimedOut or SessionEndReason.ProtocolError
             ? ConnectionState.Reconnecting
             : ConnectionState.Listening;
@@ -404,7 +545,9 @@ public sealed class StreamController : IAsyncDisposable
             owner.Capabilities = capabilities;
             owner.CapabilitiesChanged?.Invoke(capabilities);
             owner._log.Info($"Cameras: {string.Join(", ", capabilities.Cameras.Select(c => $"{c.Facing}/{c.Lens}#{c.PhysicalId ?? c.Id}"))}");
-            _ = SendAsync(Session, owner._settings.ToStartCommand());
+            owner.ResetVideoDemand();
+            owner.UpdateVideoDemand(); // the camera starts only if someone is watching
+            owner.VideoDemandChanged?.Invoke();
         }
 
         public void OnVideoConfig(VideoConfig config)
@@ -421,7 +564,7 @@ public sealed class StreamController : IAsyncDisposable
             if (!MediaAllowed)
                 return;
             owner._pipeline?.Submit(frame);
-            if (owner.State == ConnectionState.Connected)
+            if (owner.State == ConnectionState.Connected && !owner.IsVideoPaused) // late frames after a pause do not count
                 owner._state.TryMoveTo(ConnectionState.Streaming);
         }
 
@@ -445,6 +588,12 @@ public sealed class StreamController : IAsyncDisposable
                     break;
                 case ControlOps.Status when message.Message is { Length: > 0 } text:
                     owner.Notice?.Invoke(text);
+                    break;
+                case ControlOps.Unpair when MediaAllowed && Info is { Transport: Transport.WiFi, PeerFingerprint: { } peer }:
+                    owner._log.Info("The phone unpaired itself from this computer");
+                    owner.Pairing?.Store.Remove(Convert.ToHexStringLower(peer));
+                    owner.Notice?.Invoke("The phone was unpaired. Pair it again to use Wi-Fi.");
+                    _ = owner.DisconnectAsync("unpaired");
                     break;
             }
         }

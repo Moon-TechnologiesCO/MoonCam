@@ -128,6 +128,7 @@ public sealed class VideoPipeline : IAsyncDisposable
                 Interlocked.Increment(ref _decoded);
                 foreach (var sink in _sinks)
                     Deliver(sink, picture);
+                _decoder.Recycle(picture); // sinks never keep a frame, so its buffer can carry the next one
             }
         }
     }

@@ -53,6 +53,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             MoonCamTheme {
                 val state by StreamingStatus.state.collectAsStateWithLifecycle()
+                val wifiComputer by StreamingStatus.wifiComputer.collectAsStateWithLifecycle()
                 val pairedComputers by paired.all.collectAsStateWithLifecycle()
                 // Discovery runs only while the app is on screen, and only once the network may be used.
                 val discovered by remember(hasNetworkPermission) { if (hasNetworkPermission) nearby.computers else flowOf(emptyList<NearbyComputer>()) }
@@ -80,7 +81,9 @@ class MainActivity : ComponentActivity() {
                     computers = computers,
                     onRequestPermission = { requestPermissions() },
                     onConnect = { connect(it.target()) },
-                    onForget = { entry -> entry.paired?.let { paired.remove(it.fingerprintHex) } },
+                    onUnpair = { entry -> entry.paired?.let { unpair(it.fingerprintHex) } },
+                    linkedOverWifi = wifiComputer != null,
+                    onUnpairLinked = { wifiComputer?.let(::unpair) },
                     onConfirmPairing = { StreamingService.confirmPairing(this) },
                     onStop = {
                         autoConnect = false
@@ -118,6 +121,12 @@ class MainActivity : ComponentActivity() {
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putBoolean(KEY_AUTO_CONNECT, autoConnect)
+    }
+
+    /** Forgets the computer here and, if linked to it now, tells it to forget this phone as well. */
+    private fun unpair(fingerprintHex: String) {
+        StreamingService.unpair(this, fingerprintHex)
+        paired.remove(fingerprintHex)
     }
 
     private fun connect(target: LinkTarget) {

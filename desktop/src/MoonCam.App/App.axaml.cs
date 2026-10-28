@@ -43,6 +43,15 @@ public sealed class App : Application
             var window = new MainWindow { DataContext = viewModel };
             controller.AddSink(window.Preview);
             desktop.MainWindow = window;
+            if (Program.Instance is { } instance)
+            {
+                instance.ShowRequested += () => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    if (window.WindowState == Avalonia.Controls.WindowState.Minimized)
+                        window.WindowState = Avalonia.Controls.WindowState.Normal;
+                    window.Activate();
+                });
+            }
             desktop.ShutdownRequested += async (_, _) =>
             {
                 networkMonitor.Dispose();

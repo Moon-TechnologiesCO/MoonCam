@@ -28,6 +28,8 @@ over Wi-Fi.
 - **Virtual camera** (v4l2loopback, Canonical-signed module: works with Secure Boot, no reboot)
 - **Front, back, ultra-wide and telephoto** lenses, when the phone exposes them
 - **Resolution, frame rate and quality** presets (480p–1080p, 30/60 fps)
+- **Light on power**: the phone's camera rests while nobody watches (window minimised and no app using the
+  camera) and wakes in about a second when someone does
 - **Resilient**: heartbeats, automatic reconnection, frame dropping instead of growing delay
 - Coming next: microphone with noise suppression, phone mirroring, hand gestures
 

@@ -59,6 +59,8 @@ public sealed class ServerSession : IAsyncDisposable
     private readonly FrameWriter _writer;
     private readonly HeartbeatMonitor _heartbeat;
     private ulong _nextNonce;
+    private CancellationTokenSource? _run;
+    private volatile bool _endedByDesktop;
 
     public ServerSession(Stream stream, ISessionHandler handler, TimeProvider time, SessionOptions? options = null)
     {
@@ -83,6 +85,7 @@ public sealed class ServerSession : IAsyncDisposable
     public async Task<SessionEnd> RunAsync(CancellationToken cancellationToken)
     {
         using var session = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        _run = session;
         try
         {
             var rejected = await HandshakeAsync(session.Token).ConfigureAwait(false);
@@ -93,9 +96,9 @@ public sealed class ServerSession : IAsyncDisposable
             var end = await ReadLoopAsync(session.Token).ConfigureAwait(false);
             await session.CancelAsync().ConfigureAwait(false);
             var heartbeatEnd = await heartbeat.ConfigureAwait(false);
-            return heartbeatEnd ?? end;
+            return _endedByDesktop ? new SessionEnd(SessionEndReason.Cancelled) : heartbeatEnd ?? end;
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested || _endedByDesktop)
         {
             return new SessionEnd(SessionEndReason.Cancelled);
         }
@@ -122,6 +125,20 @@ public sealed class ServerSession : IAsyncDisposable
         catch (Exception e) when (e is IOException or ObjectDisposedException)
         {
             // The peer is already gone; nothing to say goodbye to.
+        }
+    }
+
+    /// <summary>Ends the session from the desktop's side (say goodbye first so the phone does not reconnect).</summary>
+    public void End()
+    {
+        _endedByDesktop = true;
+        try
+        {
+            _run?.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // Already over.
         }
     }
 

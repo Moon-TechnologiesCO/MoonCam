@@ -30,7 +30,7 @@ public sealed class FileEventLog : IEventLog
     private void Write(string level, string message, Exception? error)
     {
         var line = string.Create(CultureInfo.InvariantCulture,
-            $"{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss.fff zzz} {level} {message}{(error is null ? "" : $" | {error.GetType().Name}: {error.Message}")}{Environment.NewLine}");
+            $"{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss.fff zzz} {level} {message}{Describe(error)}{Environment.NewLine}");
         lock (_lock)
         {
             try
@@ -45,5 +45,14 @@ public sealed class FileEventLog : IEventLog
                 // Logging must never take the app down.
             }
         }
+    }
+
+    /// <summary>The error and every inner error, on one line: "outer | inner | root cause".</summary>
+    private static string Describe(Exception? error)
+    {
+        var text = new System.Text.StringBuilder();
+        for (var e = error; e is not null; e = e.InnerException)
+            text.Append(" | ").Append(e.GetType().Name).Append(": ").Append(e.Message);
+        return text.ToString();
     }
 }

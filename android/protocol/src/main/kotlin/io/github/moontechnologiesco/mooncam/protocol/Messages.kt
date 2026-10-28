@@ -58,6 +58,9 @@ object ControlOps {
     const val PAIR_REVEAL = "pairReveal"
     const val PAIR_CONFIRM = "pairConfirm"
     const val PAIRED = "paired"
+
+    /** Either side: "I no longer trust you". The receiver forgets the sender too and the session ends. */
+    const val UNPAIR = "unpair"
 }
 
 /** A command or event; fields that do not apply to an operation stay null and are not sent. */

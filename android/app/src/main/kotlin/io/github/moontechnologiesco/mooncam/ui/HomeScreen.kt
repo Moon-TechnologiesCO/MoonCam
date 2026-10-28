@@ -46,7 +46,9 @@ fun HomeScreen(
     computers: List<ComputerEntry>,
     onRequestPermission: () -> Unit,
     onConnect: (ComputerEntry) -> Unit,
-    onForget: (ComputerEntry) -> Unit,
+    onUnpair: (ComputerEntry) -> Unit,
+    linkedOverWifi: Boolean,
+    onUnpairLinked: () -> Unit,
     onConfirmPairing: () -> Unit,
     onStop: () -> Unit,
 ) {
@@ -90,9 +92,14 @@ fun HomeScreen(
 
             when {
                 state is StreamingState.Pairing -> PairingCard(state, onConfirmPairing, onStop)
-                state.isActive -> Button(onClick = onStop, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.stop)) }
+                state.isActive -> Column(Modifier.fillMaxWidth()) {
+                    Button(onClick = onStop, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.stop)) }
+                    if (linkedOverWifi) {
+                        TextButton(onClick = onUnpairLinked, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.unpair_linked)) }
+                    }
+                }
                 else -> {
-                    if (hasNetworkPermission) ComputersCard(computers, onConnect, onForget)
+                    if (hasNetworkPermission) ComputersCard(computers, onConnect, onUnpair)
                     GlassCard {
                         Text(stringResource(R.string.how_to_title), fontWeight = FontWeight.SemiBold)
                         Spacer(Modifier.height(8.dp))
@@ -139,7 +146,7 @@ private fun PairingCard(state: StreamingState.Pairing, onConfirm: () -> Unit, on
 }
 
 @Composable
-private fun ComputersCard(computers: List<ComputerEntry>, onConnect: (ComputerEntry) -> Unit, onForget: (ComputerEntry) -> Unit) {
+private fun ComputersCard(computers: List<ComputerEntry>, onConnect: (ComputerEntry) -> Unit, onUnpair: (ComputerEntry) -> Unit) {
     GlassCard {
         Text(stringResource(R.string.wifi_title), fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(8.dp))
@@ -153,7 +160,7 @@ private fun ComputersCard(computers: List<ComputerEntry>, onConnect: (ComputerEn
                     Text(computerDetail(entry), color = MoonColors.Mist, fontSize = 13.sp)
                 }
                 if (entry.paired != null) {
-                    TextButton(onClick = { onForget(entry) }) { Text(stringResource(R.string.forget)) }
+                    TextButton(onClick = { onUnpair(entry) }) { Text(stringResource(R.string.forget)) }
                     Button(onClick = { onConnect(entry) }) { Text(stringResource(R.string.connect)) }
                 } else {
                     OutlinedButton(onClick = { onConnect(entry) }) { Text(stringResource(R.string.pair)) }
@@ -207,4 +214,6 @@ private fun statusText(state: StreamingState): String = when (state) {
     is StreamingState.Rejected -> stringResource(R.string.state_rejected, state.reason)
     is StreamingState.Pairing -> stringResource(R.string.state_pairing, state.computer)
     is StreamingState.Failed -> state.message
+    is StreamingState.Disconnected ->
+        stringResource(if (state.unpaired) R.string.state_unpaired else R.string.state_disconnected, state.computer)
 }
