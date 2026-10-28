@@ -59,7 +59,6 @@ object Connector {
             socket.startHandshake()
         } catch (e: IOException) {
             if (trust.mismatch) throw IdentityChangedException(target.computer)
-            PhoneIdentity.logSelfTest()
             throw e
         }
         return Connection(socket, trust.seen ?: throw IOException("The computer sent no certificate."))
