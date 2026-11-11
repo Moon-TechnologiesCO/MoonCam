@@ -41,7 +41,9 @@
   <div class="card">The phone's microphone too, over USB or Wi-Fi, with noise reduction on your computer. It appears as "MoonCam Microphone" in your apps.</div>
 
   <h2>Install</h2>
-  <pre>sudo apt install ./mooncam_0.1.1_amd64.deb</pre>
+  <p>From the terminal, download the release and install it:</p>
+  <pre>curl -L -o mooncam.deb https://github.com/Moon-TechnologiesCO/MoonCam/releases/download/v0.1.1/mooncam_0.1.1_amd64.deb
+sudo apt install ./mooncam.deb</pre>
   <p>The package installs everything MoonCam needs: the .NET runtime, FFmpeg, adb and the signed virtual camera
   driver. On the phone, enable USB debugging and press <b>Connect via USB</b>.</p>
 
