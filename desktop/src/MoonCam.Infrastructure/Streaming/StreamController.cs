@@ -507,11 +507,15 @@ public sealed class StreamController : IAsyncDisposable
             return _recorder.Path;
         var frame = await NextPictureAsync().ConfigureAwait(false);
         var path = Path.Combine(VideosFolder, $"MoonCam {DateTime.Now:yyyy-MM-dd HH.mm.ss}.mp4");
-        var audio = _microphone is not null ? VirtualMicrophone.SourceName : null;
-        var recorder = MoonCam.Infrastructure.Capture.Recorder.Start(frame.Width & ~1, frame.Height & ~1, audio, path);
+        // The phone's microphone when it streams (already cleaned by MoonCam Microphone); otherwise the
+        // computer's default microphone, with the same noise reduction when the switch is on.
+        var phone = _microphone is not null;
+        var audio = phone ? VirtualMicrophone.SourceName : "default";
+        var filter = !phone && _noiseReduction ? VirtualMicrophone.NoiseFilter : null;
+        var recorder = MoonCam.Infrastructure.Capture.Recorder.Start(frame.Width & ~1, frame.Height & ~1, audio, path, filter);
         _recorder = recorder;
         AddSink(recorder);
-        _log.Info($"Recording {frame.Width}x{frame.Height}{(audio is null ? " without sound" : " with the phone's microphone")}: {path}");
+        _log.Info($"Recording {frame.Width}x{frame.Height} with {(phone ? "the phone's microphone" : "the computer's microphone")}: {path}");
         return path;
     }
 

@@ -24,7 +24,8 @@ public sealed class LocalCameraSource : IAsyncDisposable
     public static IReadOnlyList<string> Arguments(string device) =>
     [
         "-hide_banner", "-loglevel", "error",
-        "-f", "v4l2", "-framerate", "30", "-video_size", $"{Width}x{Height}", "-i", device,
+        // MJPEG: uncompressed 720p over USB 2 only reaches about 10 pictures a second.
+        "-f", "v4l2", "-input_format", "mjpeg", "-framerate", "30", "-video_size", $"{Width}x{Height}", "-i", device,
         "-vf", $"scale={Width}:{Height}:force_original_aspect_ratio=increase,crop={Width}:{Height}",
         "-pix_fmt", "yuv420p", "-f", "rawvideo", "pipe:1",
     ];

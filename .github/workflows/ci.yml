@@ -63,7 +63,7 @@ jobs:
         with:
           global-json-file: desktop/global.json
       - name: Build the Debian package
-        run: packaging/linux/build-deb.sh 0.6.0
+        run: packaging/linux/build-deb.sh 0.6.1
       - uses: actions/upload-artifact@v7
         with:
           name: mooncam-deb

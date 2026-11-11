@@ -110,7 +110,7 @@ cd desktop && dotnet test MoonCam.slnx
 cd android && ./gradlew :protocol:test :app:assembleDebug
 
 # Debian package
-packaging/linux/build-deb.sh 0.6.0
+packaging/linux/build-deb.sh 0.6.1
 ```
 
 No phone at hand? `FakePhone` streams a test pattern exactly like the app does:

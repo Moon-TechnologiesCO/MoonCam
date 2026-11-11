@@ -58,6 +58,43 @@ public class CaptureTests
     }
 
     [Fact]
+    public void The_computer_microphone_can_be_noise_reduced_in_the_recording()
+    {
+        var args = Recorder.Arguments(640, 360, "default", "/tmp/x.mp4", "highpass=f=100").ToList();
+
+        Assert.Equal("highpass=f=100", args[args.IndexOf("-af") + 1]);
+    }
+
+    /// <summary>A microphone never ends: stopping must still close the file. Needs PipeWire (MOONCAM_PIPEWIRE_TESTS=1).</summary>
+    [Fact]
+    public async Task A_recording_with_a_live_microphone_is_playable_after_stopping()
+    {
+        if (!HasFfmpeg || Environment.GetEnvironmentVariable("MOONCAM_PIPEWIRE_TESTS") != "1")
+            return;
+        var path = Path.Combine(Path.GetTempPath(), $"mooncam-rec-{Guid.NewGuid():N}.mp4");
+        try
+        {
+            await using var recorder = Recorder.Start(320, 180, "default", path);
+            for (var i = 0; i < 60; i++)
+            {
+                recorder.Push(Frame(320, 180, (byte)(i * 4)));
+                await Task.Delay(33);
+            }
+            var stopping = System.Diagnostics.Stopwatch.StartNew();
+            await recorder.StopAsync();
+
+            Assert.True(stopping.Elapsed < TimeSpan.FromSeconds(8), "stopping waited for the timeout");
+            var streams = Run("ffprobe", "-v", "error", "-show_entries", "stream=codec_type", "-of", "csv=p=0", path);
+            Assert.Contains("video", streams);
+            Assert.Contains("audio", streams);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public async Task A_photo_is_the_next_frame_saved_as_jpeg()
     {
         if (!HasFfmpeg)
