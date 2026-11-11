@@ -29,7 +29,7 @@ public sealed class PhoneSimulator(string host, int port, string token)
 
         await writer.WritePreambleAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
         await reader.ReadPreambleAsync(cancellationToken).ConfigureAwait(false);
-        await writer.WriteAsync(Messages.Hello(new HelloMessage("MoonCam FakePhone", "Moon Technologies", "FakePhone", "16", "0.1.0", token)), cancellationToken).ConfigureAwait(false);
+        await writer.WriteAsync(Messages.Hello(new HelloMessage("MoonCam FakePhone", "MoonCam", "FakePhone", "16", "0.1.0", token)), cancellationToken).ConfigureAwait(false);
         var welcome = Messages.ReadWelcome(await reader.ReadAsync(cancellationToken).ConfigureAwait(false)
                                            ?? throw new EndOfStreamException("No WELCOME."));
         if (!welcome.Accepted)

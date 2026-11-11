@@ -30,6 +30,6 @@ package and remove the MoonCam settings folder on your computer.
 
 ## Contact
 
-Questions about this notice: open an issue at https://github.com/Moon-TechnologiesCO/MoonCam/issues.
+Questions about this notice: open an issue at https://github.com/jdswe/MoonCam/issues.
 
 *Last updated: 2026-11-10.*
