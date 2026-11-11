@@ -9,6 +9,6 @@
     <AnalysisLevel>latest</AnalysisLevel>
     <Company>Jose Carranza</Company>
     <Product>MoonCam</Product>
-    <Version>0.6.0</Version>
+    <Version>0.6.1</Version>
   </PropertyGroup>
 </Project>

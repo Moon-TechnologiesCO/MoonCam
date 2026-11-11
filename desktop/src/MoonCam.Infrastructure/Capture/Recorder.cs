@@ -5,8 +5,8 @@ using MoonCam.Core.Media;
 namespace MoonCam.Infrastructure.Capture;
 
 /// <summary>
-/// Records what apps see (shape and background included) to an MP4 with ffmpeg: H.264 video and, when
-/// "MoonCam Microphone" exists, AAC sound from it. Frames go through a small queue and are dropped when the
+/// Records what apps see (shape and background included) to an MP4 with ffmpeg: H.264 video and AAC sound
+/// from a PipeWire source (the phone's "MoonCam Microphone", or the computer's microphone). Frames go through a small queue and are dropped when the
 /// encoder falls behind, so recording never slows the live picture. If the picture changes size mid-recording
 /// (a new shape or resolution) frames are scaled to the size the recording started with.
 /// </summary>
@@ -24,8 +24,11 @@ public sealed class Recorder : IVideoSink, IAsyncDisposable
     private long _frames;
     private long _dropped;
 
-    private Recorder(Process ffmpeg, int width, int height, string path)
+    private readonly bool _hasAudio;
+
+    private Recorder(Process ffmpeg, int width, int height, string path, bool hasAudio)
     {
+        _hasAudio = hasAudio;
         _ffmpeg = ffmpeg;
         _width = width;
         _height = height;
@@ -39,7 +42,8 @@ public sealed class Recorder : IVideoSink, IAsyncDisposable
     public long Dropped => Interlocked.Read(ref _dropped);
 
     /// <summary>ffmpeg arguments: raw I420 from stdin, timed by the clock so sound and picture stay together.</summary>
-    public static IReadOnlyList<string> Arguments(int width, int height, string? audioSource, string path)
+    /// <param name="audioFilter">An ffmpeg audio filter for the sound, e.g. noise reduction for the computer's microphone.</param>
+    public static IReadOnlyList<string> Arguments(int width, int height, string? audioSource, string path, string? audioFilter = null)
     {
         var args = new List<string>
         {
@@ -51,22 +55,26 @@ public sealed class Recorder : IVideoSink, IAsyncDisposable
             args.AddRange(["-thread_queue_size", "512", "-f", "pulse", "-i", audioSource]);
         args.AddRange(["-map", "0:v"]);
         if (audioSource is not null)
+        {
             args.AddRange(["-map", "1:a", "-c:a", "aac", "-b:a", "160k"]);
+            if (audioFilter is not null)
+                args.AddRange(["-af", audioFilter]);
+        }
         args.AddRange(["-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p",
             "-fps_mode", "vfr", "-movflags", "+faststart", path]);
         return args;
     }
 
-    public static Recorder Start(int width, int height, string? audioSource, string path)
+    public static Recorder Start(int width, int height, string? audioSource, string path, string? audioFilter = null)
     {
         Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path)!);
         var info = new ProcessStartInfo("ffmpeg") { RedirectStandardInput = true, RedirectStandardError = true };
-        foreach (var arg in Arguments(width, height, audioSource, path))
+        foreach (var arg in Arguments(width, height, audioSource, path, audioFilter))
             info.ArgumentList.Add(arg);
         var process = Process.Start(info) ?? throw new IOException("Could not start ffmpeg.");
         process.ErrorDataReceived += (_, _) => { };
         process.BeginErrorReadLine();
-        return new Recorder(process, width, height, path);
+        return new Recorder(process, width, height, path, audioSource is not null);
     }
 
     public void Push(VideoFrame frame)
@@ -102,6 +110,10 @@ public sealed class Recorder : IVideoSink, IAsyncDisposable
     {
         _queue.Writer.TryComplete();
         await _writer.ConfigureAwait(false);
+        // A microphone never ends, so ffmpeg would wait for sound forever and never write the file's index.
+        // SIGINT is ffmpeg's "finish now": it flushes both streams and closes the MP4 properly.
+        if (_hasAudio && !_ffmpeg.HasExited)
+            Interrupt(_ffmpeg.Id);
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
         try
         {
@@ -112,6 +124,19 @@ public sealed class Recorder : IVideoSink, IAsyncDisposable
             _ffmpeg.Kill(entireProcessTree: true);
         }
         return Path;
+    }
+
+    private static void Interrupt(int pid)
+    {
+        try
+        {
+            using var kill = Process.Start(new ProcessStartInfo("kill") { ArgumentList = { "-INT", pid.ToString() } });
+            kill?.WaitForExit(2000);
+        }
+        catch (System.ComponentModel.Win32Exception)
+        {
+            // No kill command: the timeout below still ends ffmpeg.
+        }
     }
 
     public async ValueTask DisposeAsync()

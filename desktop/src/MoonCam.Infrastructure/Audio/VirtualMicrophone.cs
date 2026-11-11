@@ -20,6 +20,9 @@ public sealed class VirtualMicrophone : IAsyncDisposable
     public const string SourceName = "mooncam_microphone";
     public const string Description = "MoonCam Microphone";
     public const int OutputRate = 48000;
+
+    /// <summary>A steep high-pass against hum, then FFT noise reduction. Also used for recordings from the computer's microphone.</summary>
+    public const string NoiseFilter = "highpass=f=100:poles=2,highpass=f=100:poles=2,afftdn=nr=24:nf=-42:tn=1";
     private const int QueueCapacity = 64;
 
     private readonly int _inputRate;
@@ -58,7 +61,7 @@ public sealed class VirtualMicrophone : IAsyncDisposable
     [
         "-hide_banner", "-loglevel", "error",
         "-f", "s16le", "-ar", inputRate.ToString(), "-ac", inputChannels.ToString(), "-i", "pipe:0",
-        "-af", noiseReduction ? "highpass=f=100:poles=2,highpass=f=100:poles=2,afftdn=nr=24:nf=-42:tn=1" : "anull",
+        "-af", noiseReduction ? NoiseFilter : "anull",
         "-f", "s16le", "-ar", OutputRate.ToString(), "-ac", "1", "pipe:1",
     ];
 
