@@ -11,7 +11,7 @@ public class VirtualMicrophoneTests
 
         Assert.Equal("44100", args[args.IndexOf("-ar") + 1]);     // input rate
         Assert.Equal("2", args[args.IndexOf("-ac") + 1]);          // input channels
-        Assert.Contains("highpass=f=80", args[args.IndexOf("-af") + 1]);
+        Assert.Contains("highpass=f=100", args[args.IndexOf("-af") + 1]);
         Assert.Contains("afftdn=", args[args.IndexOf("-af") + 1]);
         Assert.Equal(VirtualMicrophone.OutputRate.ToString(), args[args.LastIndexOf("-ar") + 1]); // output rate
         Assert.Equal("pipe:1", args[^1]);
@@ -27,5 +27,26 @@ public class VirtualMicrophoneTests
             microphone.Submit(packet);
 
         Assert.True(microphone.Dropped > 0);
+    }
+
+    [Fact]
+    public void Without_noise_reduction_the_sound_is_only_resampled()
+    {
+        var args = VirtualMicrophone.DenoiseArguments(44100, 2, noiseReduction: false).ToList();
+
+        Assert.Equal("anull", args[args.IndexOf("-af") + 1]);
+        Assert.Equal(VirtualMicrophone.OutputRate.ToString(), args[args.LastIndexOf("-ar") + 1]);
+        Assert.Equal("1", args[args.LastIndexOf("-ac") + 1]);
+    }
+
+    [Fact]
+    public async Task Noise_reduction_can_be_switched_before_starting()
+    {
+        await using var microphone = new VirtualMicrophone(48000, 1);
+        Assert.True(microphone.NoiseReduction);
+
+        await microphone.SetNoiseReductionAsync(false);
+
+        Assert.False(microphone.NoiseReduction);
     }
 }
