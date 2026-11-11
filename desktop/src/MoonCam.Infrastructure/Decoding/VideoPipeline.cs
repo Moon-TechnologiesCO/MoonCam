@@ -24,6 +24,8 @@ public sealed class VideoPipeline : IAsyncDisposable
     });
     private readonly Task _worker;
     private ImmutableArray<IVideoSink> _sinks = [];
+    private readonly FrameShaper _shaper = new();
+    private volatile int _shape; // FrameShape
     private VideoConfig? _pendingConfig; // a configuration rescued from a drained queue; never lost
     private volatile bool _waitingForKeyFrame = true;
     private long _decoded;
@@ -43,6 +45,13 @@ public sealed class VideoPipeline : IAsyncDisposable
 
     /// <summary>Raised on the decoder thread when a sink throws. The other sinks keep receiving pictures.</summary>
     public event Action<IVideoSink, Exception>? SinkFailed;
+
+    /// <summary>The shape every sink receives (preview and virtual camera alike).</summary>
+    public FrameShape Shape
+    {
+        get => (FrameShape)_shape;
+        set => _shape = (int)value;
+    }
 
     public long FramesDecoded => Interlocked.Read(ref _decoded);
     public long FramesDropped => Interlocked.Read(ref _dropped);
@@ -126,8 +135,9 @@ public sealed class VideoPipeline : IAsyncDisposable
             foreach (var picture in pictures)
             {
                 Interlocked.Increment(ref _decoded);
+                var shaped = _shaper.Apply(picture, Shape);
                 foreach (var sink in _sinks)
-                    Deliver(sink, picture);
+                    Deliver(sink, shaped);
                 _decoder.Recycle(picture); // sinks never keep a frame, so its buffer can carry the next one
             }
         }

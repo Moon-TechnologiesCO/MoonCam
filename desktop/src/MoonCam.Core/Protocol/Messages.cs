@@ -31,7 +31,9 @@ public sealed record CameraInfo(
     string? PhysicalId,
     double? FocalLengthMm,
     IReadOnlyList<VideoSize> Sizes,
-    IReadOnlyList<int> FrameRates);
+    IReadOnlyList<int> FrameRates,
+    bool? HasFlash = null,
+    bool? ManualFocus = null);
 
 public sealed record CapabilitiesMessage(IReadOnlyList<CameraInfo> Cameras);
 
@@ -41,6 +43,9 @@ public static class ControlOps
     public const string Start = "start";
     public const string Stop = "stop";
     public const string KeyFrame = "keyFrame";
+
+    /// <summary>Desktop → phone: light and image adjustments (Torch, Brightness) that apply without restarting.</summary>
+    public const string Adjust = "adjust";
     public const string Status = "status";
 
     // Wi-Fi pairing (docs/security.md): commit → nonce → reveal → both screens show the code → confirm → paired.
@@ -65,7 +70,11 @@ public sealed record ControlMessage(
     string? Codec = null,
     bool? Streaming = null,
     string? Message = null,
-    string? Data = null);
+    string? Data = null,
+    bool? Torch = null,
+    int? Brightness = null,
+    int? Focus = null,
+    bool? AutoFocus = null);
 
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,

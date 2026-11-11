@@ -67,6 +67,12 @@ class CameraStreamer(
     private var current: StreamRequest? = null
     @Volatile private var waitingForKeyFrame = true
 
+    // Light and image adjustments from the computer; they survive camera switches during the session.
+    private var torch = false
+    private var brightness = 0
+    private var focus: Int? = null // null = continuous autofocus
+    private var repeatingFps = 30
+
     // Every start/stop begins a new generation. Camera2 delivers callbacks asynchronously, so a callback from
     // an older generation (e.g. "session configured" after we already switched cameras) must be ignored.
     private var generation = 0
@@ -108,6 +114,16 @@ class CameraStreamer(
         generation++
         current = null
         closeCapture()
+    }
+
+    /** Flashlight and exposure; applied to the running camera at once, and to every camera opened later. */
+    fun adjust(torch: Boolean?, brightness: Int?, focus: Int?, autoFocus: Boolean?) = handler.post {
+        torch?.let { this.torch = it }
+        brightness?.let { this.brightness = it.coerceIn(-100, 100) }
+        if (autoFocus == true) this.focus = null else focus?.let { this.focus = it.coerceIn(0, 100) }
+        val device = camera
+        val captureSession = session
+        if (device != null && captureSession != null) applyRepeating(device, captureSession)
     }
 
     fun requestKeyFrame() = handler.post {
@@ -225,17 +241,8 @@ class CameraStreamer(
                         return
                     }
                     session = captureSession
-                    try {
-                        val request = device.createCaptureRequest(CameraDevice.TEMPLATE_RECORD).apply {
-                            addTarget(surface)
-                            bestFpsRange(device.id, fps)?.let { set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, it) }
-                        }
-                        captureSession.setRepeatingRequest(request.build(), null, handler)
-                    } catch (e: IllegalStateException) {
-                        cameraLost(gen, device)
-                    } catch (e: CameraAccessException) {
-                        cameraLost(gen, device)
-                    }
+                    repeatingFps = fps
+                    if (!applyRepeating(device, captureSession)) cameraLost(gen, device)
                 }
 
                 override fun onConfigureFailed(captureSession: CameraCaptureSession) = cameraLost(gen, device)
@@ -246,6 +253,40 @@ class CameraStreamer(
             cameraLost(gen, device)
         } catch (e: CameraAccessException) {
             cameraLost(gen, device)
+        }
+    }
+
+    /** (Re)builds the repeating request with the current frame rate, flashlight and exposure. */
+    private fun applyRepeating(device: CameraDevice, captureSession: CameraCaptureSession): Boolean {
+        val surface = inputSurface ?: return false
+        return try {
+            val c = catalog.characteristics(device.id)
+            val request = device.createCaptureRequest(CameraDevice.TEMPLATE_RECORD).apply {
+                addTarget(surface)
+                bestFpsRange(device.id, repeatingFps)?.let { set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, it) }
+                set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON)
+                val hasFlash = c.get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true
+                set(CaptureRequest.FLASH_MODE,
+                    if (torch && hasFlash) CaptureRequest.FLASH_MODE_TORCH else CaptureRequest.FLASH_MODE_OFF)
+                val closest = c.get(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE) ?: 0f
+                val manual = focus
+                if (manual != null && closest > 0f) {
+                    set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_OFF)
+                    set(CaptureRequest.LENS_FOCUS_DISTANCE, closest * manual / 100f) // diopters: 0 = infinity
+                } else {
+                    set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO)
+                }
+                c.get(CameraCharacteristics.CONTROL_AE_COMPENSATION_RANGE)?.let { range ->
+                    val steps = if (brightness >= 0) brightness * range.upper / 100 else -brightness * range.lower / 100
+                    set(CaptureRequest.CONTROL_AE_EXPOSURE_COMPENSATION, steps.coerceIn(range.lower, range.upper))
+                }
+            }
+            captureSession.setRepeatingRequest(request.build(), null, handler)
+            true
+        } catch (e: IllegalStateException) {
+            false
+        } catch (e: CameraAccessException) {
+            false
         }
     }
 

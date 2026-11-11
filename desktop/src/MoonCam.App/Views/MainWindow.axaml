@@ -158,6 +158,44 @@
                         </ComboBox>
                         <TextBlock Classes="muted" FontSize="12" Text="Quality" Margin="4,10,0,4" />
                         <ComboBox ItemsSource="{Binding Qualities}" SelectedIndex="{Binding SelectedQuality}" />
+                        <TextBlock Classes="muted" FontSize="12" Text="Shape" Margin="4,10,0,4" />
+                        <ComboBox ItemsSource="{Binding Shapes}" SelectedItem="{Binding SelectedShape}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:ShapeOption">
+                                    <TextBlock Text="{Binding Label}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+
+                        <TextBlock Classes="section" Text="LIGHT" />
+                        <Border Classes="glass">
+                            <StackPanel Spacing="6">
+                                <ToggleSwitch Content="Phone flashlight" IsChecked="{Binding IsTorchOn}"
+                                              IsEnabled="{Binding IsTorchAvailable}" />
+                                <TextBlock Text="{Binding TorchHint}" Classes="muted" FontSize="12" TextWrapping="Wrap" />
+                                <DockPanel Margin="0,6,0,0">
+                                    <TextBlock DockPanel.Dock="Right" Classes="muted" FontSize="12" VerticalAlignment="Center"
+                                               Text="{Binding Brightness, StringFormat={}{0:+0;-0;0}}" />
+                                    <TextBlock Text="Brightness" FontSize="13" VerticalAlignment="Center" />
+                                </DockPanel>
+                                <Slider Minimum="-100" Maximum="100" TickFrequency="10" IsSnapToTickEnabled="True"
+                                        Value="{Binding Brightness}" ToolTip.Tip="Darker or brighter than automatic" />
+                            </StackPanel>
+                        </Border>
+
+                        <TextBlock Classes="section" Text="FOCUS" />
+                        <Border Classes="glass">
+                            <StackPanel Spacing="6">
+                                <ToggleSwitch Content="Autofocus" IsChecked="{Binding IsAutoFocus}"
+                                              IsEnabled="{Binding IsManualFocusAvailable}" />
+                                <DockPanel IsVisible="{Binding !IsAutoFocus}">
+                                    <TextBlock DockPanel.Dock="Left" Text="Far" Classes="muted" FontSize="12" VerticalAlignment="Center" />
+                                    <TextBlock DockPanel.Dock="Right" Text="Close" Classes="muted" FontSize="12" VerticalAlignment="Center" />
+                                    <Slider Margin="8,0" Minimum="0" Maximum="100" Value="{Binding FocusDistance}"
+                                            ToolTip.Tip="Focus by hand: left for far away, right for close-ups" />
+                                </DockPanel>
+                            </StackPanel>
+                        </Border>
 
                         <TextBlock Classes="section" Text="VIRTUAL CAMERA" />
                         <Border Classes="glass">

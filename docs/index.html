@@ -28,7 +28,7 @@
     <img class="icon" src="img/icon.png" alt="MoonCam icon" width="132" height="132">
     <h1>MoonCam</h1>
     <p>Your Android phone as a webcam and a noise-cancelled microphone for Linux. Over a USB cable or your Wi-Fi, with nothing leaving your home.</p>
-    <a class="badge" href="#releases"><b>v0.4</b> New: the phone's microphone, with noise reduction</a>
+    <a class="badge" href="#releases"><b>v0.5</b> New: flashlight, brightness, focus and picture shapes</a>
     <div class="actions">
       <a class="btn btn-primary" href="#install">Download MoonCam</a>
       <a class="btn btn-ghost" href="https://github.com/jdswe/MoonCam">
@@ -67,6 +67,16 @@
           <span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3.5"/><path d="M12 3.5v5M20.5 12h-5M12 20.5v-5M3.5 12h5"/></svg></span>
           <h3>Every lens</h3>
           <p>Front, back, ultra-wide and telephoto when your phone has them. Choose 480p to 1080p, 30 or 60 frames per second and the quality.</p>
+        </div>
+        <div class="card">
+          <span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 2h6l-1 6h-4z"/><path d="M10 8v12a2 2 0 0 0 4 0V8"/><path d="M5 5l1.5 1.5M19 5l-1.5 1.5"/></svg></span>
+          <h3>Light, brightness and focus</h3>
+          <p>Turn on the phone's flashlight from the computer, make the picture brighter or darker, and switch between autofocus and focusing by hand.</p>
+        </div>
+        <div class="card">
+          <span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="9" height="12" rx="3"/><circle cx="17" cy="12" r="4.5"/></svg></span>
+          <h3>Any shape</h3>
+          <p>Wide 16:9, classic 4:3, square, circle, vertical 9:16 for stories, cinema 21:9, and rounded corners. Every app receives the shape you pick.</p>
         </div>
         <div class="card">
           <span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="16" height="10" rx="2.5"/><path d="M21 11v2"/><path d="M7 10.5v3M10 10.5v3"/></svg></span>
@@ -155,6 +165,9 @@
             <tr><td>Wi-Fi pairing, encryption and auto-connect</td><td class="yes">Ready</td></tr>
             <tr><td>Phone microphone with a noise cancellation switch</td><td class="yes">Ready</td></tr>
             <tr><td>Lens, resolution, frame rate and quality choice</td><td class="yes">Ready</td></tr>
+            <tr><td>Flashlight, brightness and focus from the computer</td><td class="yes">Ready</td></tr>
+            <tr><td>Picture shapes: 16:9, 4:3, square, circle, 9:16, 21:9, rounded</td><td class="yes">Ready</td></tr>
+            <tr><td>Background blur and backgrounds (built-in or your own)</td><td class="part">Next</td></tr>
             <tr><td>Stronger noise suppression (RNNoise) and lip sync</td><td class="part">In progress</td></tr>
             <tr><td>Hardware video decoding to save CPU</td><td class="part">In progress</td></tr>
             <tr><td>Phone mirroring and hand gestures</td><td class="no">Planned</td></tr>
@@ -170,7 +183,15 @@
       <h2>What's new</h2>
       <div class="releases">
         <article class="card release">
-          <header><h3>0.4.0 <span class="latest">Latest</span></h3><time datetime="2026-11-10">November 10, 2026</time></header>
+          <header><h3>0.5.0 <span class="latest">Latest</span></h3><time datetime="2026-11-11">November 11, 2026</time></header>
+          <ul>
+            <li>Turn the phone's flashlight on or off from the computer.</li>
+            <li>Brightness slider, and autofocus or focus by hand.</li>
+            <li>Picture shapes: 16:9, 4:3, square, circle, vertical 9:16, cinema 21:9 and rounded corners.</li>
+          </ul>
+        </article>
+        <article class="card release">
+          <header><h3>0.4.0</h3><time datetime="2026-11-10">November 10, 2026</time></header>
           <ul>
             <li>The phone's microphone streams over USB and Wi-Fi to <code>MoonCam Microphone</code>.</li>
             <li>A <b>Noise cancellation</b> switch on the computer removes hum and background noise, and you can turn it off at any time without dropping the call.</li>
