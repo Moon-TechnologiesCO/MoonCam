@@ -165,6 +165,15 @@
                                 <ToggleSwitch Content="Use as webcam" IsChecked="{Binding IsVirtualCameraOn}"
                                               IsEnabled="{Binding IsVirtualCameraAvailable}" />
                                 <TextBlock Text="{Binding VirtualCameraStatus}" Classes="muted" FontSize="12" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+
+                        <TextBlock Classes="section" Text="MICROPHONE" />
+                        <Border Classes="glass">
+                            <StackPanel Spacing="6">
+                                <ToggleSwitch Content="Noise cancellation" IsChecked="{Binding IsNoiseReductionOn}" />
+                                <TextBlock Text="Removes hum and background noise from the phone's microphone before apps hear it."
+                                           Classes="muted" FontSize="12" TextWrapping="Wrap" />
                                 <TextBlock Text="{Binding MicrophoneStatus}" Classes="muted" FontSize="12" TextWrapping="Wrap" />
                             </StackPanel>
                         </Border>

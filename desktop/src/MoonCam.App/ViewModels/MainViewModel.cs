@@ -103,6 +103,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private bool _isVirtualCameraAvailable;
     [ObservableProperty] private bool _isVirtualCameraOn;
     [ObservableProperty] private string _microphoneStatus = "";
+    [ObservableProperty] private bool _isNoiseReductionOn = true;
     [ObservableProperty] private string _virtualCameraStatus = "";
     [ObservableProperty] private bool _isSetupComplete = true;
     [ObservableProperty] private bool _isInstalling;
@@ -264,6 +265,20 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     partial void OnSelectedPresetChanged(PresetOption value) => ApplySettings();
 
     partial void OnSelectedQualityChanged(int value) => ApplySettings();
+
+    partial void OnIsNoiseReductionOnChanged(bool value) => _ = SetNoiseReductionAsync(value);
+
+    private async Task SetNoiseReductionAsync(bool on)
+    {
+        try
+        {
+            await _controller.SetNoiseReductionAsync(on);
+        }
+        catch (Exception e) when (e is IOException or InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            Notice = $"Could not change noise reduction: {e.Message}";
+        }
+    }
 
     partial void OnIsVirtualCameraOnChanged(bool value)
     {

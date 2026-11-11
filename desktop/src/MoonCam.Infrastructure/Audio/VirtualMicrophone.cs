@@ -7,8 +7,10 @@ namespace MoonCam.Infrastructure.Audio;
 /// <summary>
 /// Makes the phone's microphone appear as "MoonCam Microphone", a PipeWire source every app can record from.
 ///
-/// Pipeline: phone PCM (16-bit little-endian) → ffmpeg (high-pass and FFT noise reduction) → pw-cat → the
-/// virtual source. Packets are dropped when the pipeline falls behind, so latency never grows.
+/// Pipeline: phone PCM (16-bit little-endian) → ffmpeg (a steep high-pass against hum, then FFT noise reduction, or a plain copy when
+/// noise reduction is off) → pw-cat → the virtual source. Packets are dropped when the pipeline falls behind, so
+/// latency never grows. Turning noise reduction on or off restarts only the ffmpeg and pw-cat stage: the source
+/// that apps record from stays, so a call in progress keeps its microphone.
 /// </summary>
 public sealed class VirtualMicrophone : IAsyncDisposable
 {
@@ -27,28 +29,36 @@ public sealed class VirtualMicrophone : IAsyncDisposable
         FullMode = BoundedChannelFullMode.Wait, // TryWrite returns false when full, so Submit can count the drop
         SingleReader = true,
     });
+    private readonly SemaphoreSlim _stageGate = new(1, 1);
     private Process? _loopback;
     private Process? _ffmpeg;
     private Process? _pwcat;
     private Task? _writer;
     private Task? _pump;
     private long _dropped;
+    private volatile bool _noiseReduction;
+    private volatile Stream? _toFfmpeg;
 
-    public VirtualMicrophone(int inputRate, int inputChannels)
+    public VirtualMicrophone(int inputRate, int inputChannels, bool noiseReduction = true)
     {
         _inputRate = inputRate;
         _inputChannels = inputChannels;
+        _noiseReduction = noiseReduction;
     }
+
+    /// <summary>Whether the high-pass and FFT noise reduction run. Change it with <see cref="SetNoiseReductionAsync"/>.</summary>
+    public bool NoiseReduction => _noiseReduction;
 
     /// <summary>Packets dropped because the pipeline could not keep up.</summary>
     public long Dropped => Interlocked.Read(ref _dropped);
 
-    /// <summary>ffmpeg arguments for the noise reduction stage (high-pass, then FFT denoise).</summary>
-    public static IReadOnlyList<string> DenoiseArguments(int inputRate, int inputChannels) =>
+    /// <summary>ffmpeg arguments for the processing stage: high-pass then FFT denoise, or a plain copy when off.
+    /// Both resample to 48 kHz mono.</summary>
+    public static IReadOnlyList<string> DenoiseArguments(int inputRate, int inputChannels, bool noiseReduction = true) =>
     [
         "-hide_banner", "-loglevel", "error",
         "-f", "s16le", "-ar", inputRate.ToString(), "-ac", inputChannels.ToString(), "-i", "pipe:0",
-        "-af", "highpass=f=80,afftdn=nr=18:nf=-30:tn=1",
+        "-af", noiseReduction ? "highpass=f=100:poles=2,highpass=f=100:poles=2,afftdn=nr=24:nf=-42:tn=1" : "anull",
         "-f", "s16le", "-ar", OutputRate.ToString(), "-ac", "1", "pipe:1",
     ];
 
@@ -66,15 +76,62 @@ public sealed class VirtualMicrophone : IAsyncDisposable
             "-o", $"{{ media.class=Audio/Source node.description=\"{Description}\" }}",
         ]);
 
-        _ffmpeg = Run("ffmpeg", DenoiseArguments(_inputRate, _inputChannels));
+        StartStage();
+        _writer = Task.Run(WriteLoopAsync);
+    }
+
+    /// <summary>Turns noise reduction on or off while running, without removing the source apps record from.</summary>
+    public async Task SetNoiseReductionAsync(bool on)
+    {
+        if (_noiseReduction == on)
+            return;
+        await _stageGate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            _noiseReduction = on;
+            if (_ffmpeg is null)
+                return; // not started: Start uses the new value
+            await StopStageAsync().ConfigureAwait(false);
+            StartStage();
+        }
+        finally
+        {
+            _stageGate.Release();
+        }
+    }
+
+    private void StartStage()
+    {
+        _ffmpeg = Run("ffmpeg", DenoiseArguments(_inputRate, _inputChannels, _noiseReduction));
         _pwcat = Run("pw-cat",
         [
             "--playback", "--raw", "--target", SinkName,
-            "--rate", OutputRate.ToString(), "--channels", "1", "--format", "s16", "--latency", "40ms", "-",
+            "--rate", OutputRate.ToString(), "--channels", "1", "--format", "s16", "--latency", "60ms", "-",
         ]);
-
-        _writer = Task.Run(() => WriteLoopAsync(_ffmpeg.StandardInput.BaseStream));
+        _toFfmpeg = _ffmpeg.StandardInput.BaseStream;
         _pump = Task.Run(() => PumpAsync(_ffmpeg.StandardOutput.BaseStream, _pwcat.StandardInput.BaseStream));
+    }
+
+    private async Task StopStageAsync()
+    {
+        _toFfmpeg = null;
+        foreach (var process in new[] { _ffmpeg, _pwcat })
+            await KillAsync(process).ConfigureAwait(false);
+        if (_pump is not null) await _pump.ConfigureAwait(false);
+        _ffmpeg = _pwcat = null;
+        _pump = null;
+    }
+
+    private static async Task KillAsync(Process? process)
+    {
+        if (process is null)
+            return;
+        if (!process.HasExited)
+        {
+            try { process.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
+            await process.WaitForExitAsync().ConfigureAwait(false);
+        }
+        process.Dispose();
     }
 
     /// <summary>Queues one PCM packet from the phone. Never blocks the network reader.</summary>
@@ -84,18 +141,24 @@ public sealed class VirtualMicrophone : IAsyncDisposable
             Interlocked.Increment(ref _dropped);
     }
 
-    private async Task WriteLoopAsync(Stream toFfmpeg)
+    private async Task WriteLoopAsync()
     {
-        try
+        await foreach (var packet in _queue.Reader.ReadAllAsync())
         {
-            await foreach (var packet in _queue.Reader.ReadAllAsync())
+            // While the stage restarts there is no ffmpeg to write to: those few packets are dropped.
+            if (_toFfmpeg is not { } toFfmpeg)
+            {
+                Interlocked.Increment(ref _dropped);
+                continue;
+            }
+            try
+            {
                 await toFfmpeg.WriteAsync(packet);
-            await toFfmpeg.FlushAsync();
-            toFfmpeg.Close();
-        }
-        catch (IOException)
-        {
-            // ffmpeg has exited; Stop reports it.
+            }
+            catch (Exception e) when (e is IOException or ObjectDisposedException)
+            {
+                Interlocked.Increment(ref _dropped); // ffmpeg exited or is being replaced
+            }
         }
     }
 
@@ -109,26 +172,29 @@ public sealed class VirtualMicrophone : IAsyncDisposable
                 await toPwCat.WriteAsync(buffer.AsMemory(0, read));
             toPwCat.Close();
         }
-        catch (IOException)
+        catch (Exception e) when (e is IOException or ObjectDisposedException)
         {
-            // One of the processes exited; Stop cleans up.
+            // One of the processes exited or is being replaced.
         }
     }
 
     public async ValueTask DisposeAsync()
     {
         _queue.Writer.TryComplete();
-        foreach (var process in new[] { _ffmpeg, _pwcat, _loopback })
+        await _stageGate.WaitAsync().ConfigureAwait(false);
+        try
         {
-            if (process is null || process.HasExited)
-                continue;
-            try { process.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
-            await process.WaitForExitAsync();
-            process.Dispose();
+            await StopStageAsync().ConfigureAwait(false);
+            await KillAsync(_loopback).ConfigureAwait(false);
+            _loopback = null;
+            if (_writer is not null) await _writer.ConfigureAwait(false);
         }
-        if (_writer is not null) await _writer.ConfigureAwait(false);
-        if (_pump is not null) await _pump.ConfigureAwait(false);
+        finally
+        {
+            _stageGate.Release();
+        }
         DestroySink();
+        _stageGate.Dispose();
     }
 
     private static void EnsureSink()

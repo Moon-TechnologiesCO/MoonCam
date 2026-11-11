@@ -89,6 +89,20 @@ public sealed class StreamController : IAsyncDisposable
 
     public StreamSettings Settings => _settings;
 
+    private volatile bool _noiseReduction = true;
+
+    /// <summary>Whether the phone's microphone is noise-reduced before apps hear it. On by default.</summary>
+    public bool NoiseReduction => _noiseReduction;
+
+    /// <summary>Turns noise reduction on or off, also while the phone's microphone is streaming.</summary>
+    public async Task SetNoiseReductionAsync(bool on)
+    {
+        _noiseReduction = on;
+        _log.Info($"Noise reduction {(on ? "on" : "off")}");
+        if (_microphone is { } microphone)
+            await microphone.SetNoiseReductionAsync(on).ConfigureAwait(false);
+    }
+
     public string? VirtualCameraPath => _virtualCamera?.DevicePath;
 
     public int Port => _usbServer?.LocalEndpoint.Port ?? _port;
@@ -592,7 +606,7 @@ public sealed class StreamController : IAsyncDisposable
             try
             {
                 owner.StopMicrophoneAsync().GetAwaiter().GetResult(); // the old source must be gone before the new one
-                owner._microphone = new VirtualMicrophone(config.SampleRate, config.Channels);
+                owner._microphone = new VirtualMicrophone(config.SampleRate, config.Channels, owner._noiseReduction);
                 owner._microphone.Start();
                 owner.Notice?.Invoke("The phone's microphone is on: pick \"MoonCam Microphone\" in your apps.");
             }
