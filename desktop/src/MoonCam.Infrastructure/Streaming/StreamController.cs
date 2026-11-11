@@ -6,6 +6,7 @@ using MoonCam.Core.Network;
 using MoonCam.Core.Protocol;
 using MoonCam.Core.Session;
 using MoonCam.Infrastructure.Adb;
+using MoonCam.Infrastructure.Audio;
 using MoonCam.Infrastructure.Decoding;
 using MoonCam.Infrastructure.Discovery;
 using MoonCam.Infrastructure.Network;
@@ -53,6 +54,7 @@ public sealed class StreamController : IAsyncDisposable
     private string _token = SessionToken.Create();
     private StreamSettings _settings = StreamSettings.Default;
     private VideoConfig? _videoConfig;
+    private VirtualMicrophone? _microphone;
     private long _lastStatsFrames;
     private long _lastStatsTimestamp;
     private string? _lastProblem;
@@ -408,6 +410,14 @@ public sealed class StreamController : IAsyncDisposable
     }
 
     /// <summary>Logs every problem; shows it to the user once until a different one happens.</summary>
+    private async Task StopMicrophoneAsync()
+    {
+        var microphone = _microphone;
+        _microphone = null;
+        if (microphone is not null)
+            await microphone.DisposeAsync().ConfigureAwait(false);
+    }
+
     private void ReportProblem(string what, Exception error)
     {
         _log.Warn(what, error);
@@ -477,6 +487,7 @@ public sealed class StreamController : IAsyncDisposable
         }
         if (_pipeline is not null)
             await _pipeline.DisposeAsync().ConfigureAwait(false);
+        await StopMicrophoneAsync().ConfigureAwait(false);
         DisableVirtualCamera();
         _state.TryMoveTo(ConnectionState.Stopped);
     }
@@ -568,9 +579,35 @@ public sealed class StreamController : IAsyncDisposable
                 owner._state.TryMoveTo(ConnectionState.Streaming);
         }
 
-        public void OnAudioConfig(AudioConfig config) { } // stage 3
+        public void OnAudioConfig(AudioConfig config)
+        {
+            if (!MediaAllowed)
+                return;
+            owner._log.Info($"Audio: codec {config.Codec}, {config.SampleRate} Hz, {config.Channels} ch");
+            if (config.Codec != AudioCodec.PcmS16Le)
+            {
+                owner._log.Info("Only PCM audio is supported for the microphone right now.");
+                return;
+            }
+            try
+            {
+                owner.StopMicrophoneAsync().GetAwaiter().GetResult(); // the old source must be gone before the new one
+                owner._microphone = new VirtualMicrophone(config.SampleRate, config.Channels);
+                owner._microphone.Start();
+                owner.Notice?.Invoke("The phone's microphone is on: pick \"MoonCam Microphone\" in your apps.");
+            }
+            catch (Exception e) when (e is IOException or System.ComponentModel.Win32Exception)
+            {
+                owner.ReportProblem("Microphone problem", e);
+            }
+        }
 
-        public void OnAudioFrame(Frame frame) { } // stage 3
+        public void OnAudioFrame(Frame frame)
+        {
+            if (!MediaAllowed)
+                return;
+            owner._microphone?.Submit(frame.Payload);
+        }
 
         public void OnControl(ControlMessage message)
         {

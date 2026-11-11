@@ -90,6 +90,20 @@ object Messages {
     fun control(message: ControlMessage) = encode(FrameType.CONTROL, message, ControlMessage.serializer())
     fun bye(reason: String) = encode(FrameType.BYE, ByeMessage(reason), ByeMessage.serializer())
 
+    /** AUDIO_CONFIG: codec, sample rate (u32), channels, then codec data (empty for PCM). */
+    fun audioConfig(config: AudioConfig): Frame {
+        val payload = ByteBuffer.allocate(6 + config.codecData.size).order(ByteOrder.BIG_ENDIAN)
+            .put(config.codec.toByte())
+            .putInt(config.sampleRate)
+            .put(config.channels.toByte())
+            .put(config.codecData)
+            .array()
+        return Frame(FrameType.AUDIO_CONFIG, payload)
+    }
+
+    /** One AUDIO_FRAME: a packet of 16-bit little-endian PCM. */
+    fun audioFrame(pcm: ByteArray, timestampUs: Long) = Frame(FrameType.AUDIO_FRAME, pcm, timestampUs = timestampUs)
+
     fun readWelcome(frame: Frame) = decode(frame, FrameType.WELCOME, WelcomeMessage.serializer())
     fun readControl(frame: Frame) = decode(frame, FrameType.CONTROL, ControlMessage.serializer())
     fun readBye(frame: Frame) = decode(frame, FrameType.BYE, ByeMessage.serializer())
