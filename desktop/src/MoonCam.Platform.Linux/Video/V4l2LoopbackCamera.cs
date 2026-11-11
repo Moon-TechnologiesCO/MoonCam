@@ -105,7 +105,7 @@ public sealed unsafe class V4l2LoopbackCamera : IVirtualCamera
         {
             if (_fd < 0)
                 return;
-            if (_format != (frame.Width, frame.Height) && !TrySetFormat(frame.Width, frame.Height))
+            if (_format != (frame.Width, frame.Height) && !TryResize(frame.Width, frame.Height))
                 frame = I420Scaler.Scale(frame, _format.Width, _format.Height);
             Write(frame);
             _lastLiveWriteMs = Environment.TickCount64;
@@ -159,7 +159,28 @@ public sealed unsafe class V4l2LoopbackCamera : IVirtualCamera
         }
     }
 
-    /// <summary>Changes the device resolution. False when a reader holds the current format (EBUSY).</summary>
+    /// <summary>
+    /// Changes the device resolution for live video. Once frames were written, v4l2loopback keeps the size until
+    /// every writer closes the device, so when no app is reading MoonCam reopens it with the new size. While an
+    /// app reads, its size stays and the caller scales (false).
+    /// </summary>
+    private bool TryResize(int width, int height)
+    {
+        if (TrySetFormat(width, height))
+            return true;
+        if (_readers.Any)
+            return false;
+        var fd = V4l2.open(DevicePath, V4l2.OpenWriteOnly | V4l2.OpenCloseOnExec);
+        if (fd < 0)
+            return false;
+        V4l2.close(_fd);
+        _fd = fd;
+        _format = ReadFormat(); // (0,0) once the driver has forgotten the old size
+        return TrySetFormat(width, height);
+    }
+
+    /// <summary>Changes the device resolution. False when the current size is locked (EBUSY or EINVAL while
+    /// it is in use); throws only when the device has no usable size at all.</summary>
     private bool TrySetFormat(int width, int height)
     {
         var format = V4l2.OutputFormat(width, height);
@@ -168,7 +189,7 @@ public sealed unsafe class V4l2LoopbackCamera : IVirtualCamera
             if (V4l2.ioctl(_fd, V4l2.VidiocSetFormat, p) != 0)
             {
                 var errno = Marshal.GetLastPInvokeError();
-                if (errno == V4l2.ErrorBusy && _format is { Width: > 0, Height: > 0 })
+                if (errno is V4l2.ErrorBusy or V4l2.ErrorInvalid && _format is { Width: > 0, Height: > 0 })
                     return false;
                 throw new IOException($"{DevicePath} refused {width}x{height} I420 (errno {errno}).");
             }

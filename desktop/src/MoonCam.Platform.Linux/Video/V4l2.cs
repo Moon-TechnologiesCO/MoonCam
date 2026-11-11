@@ -67,6 +67,7 @@ internal static partial class V4l2
     }
 
     public const int ErrorBusy = 16; // EBUSY
+    public const int ErrorInvalid = 22; // EINVAL
 
     /// <summary>Reads driver and card names from a v4l2_capability buffer.</summary>
     public static (string Driver, string Card, uint DeviceCaps) ParseCapability(ReadOnlySpan<byte> capability)
