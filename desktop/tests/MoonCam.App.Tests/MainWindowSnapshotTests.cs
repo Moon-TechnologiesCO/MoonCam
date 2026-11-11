@@ -162,6 +162,8 @@ public class MainWindowSnapshotTests
             new("Video decoder (FFmpeg)", "Turns the phone's video into pictures.", true),
         ];
 
+        public IReadOnlyList<string> Microphones() => [];
+
         public Task<MoonCam.Core.Setup.SetupResult> InstallAsync(CancellationToken cancellationToken = default)
             => Task.FromResult(new MoonCam.Core.Setup.SetupResult(MoonCam.Core.Setup.SetupOutcome.Ready, ""));
     }

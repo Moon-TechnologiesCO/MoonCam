@@ -18,5 +18,8 @@ public interface ISystemSetup
 {
     IReadOnlyList<Component> Check();
 
+    /// <summary>Names of the microphones the computer can record from (empty when none are found).</summary>
+    IReadOnlyList<string> Microphones();
+
     Task<SetupResult> InstallAsync(CancellationToken cancellationToken = default);
 }

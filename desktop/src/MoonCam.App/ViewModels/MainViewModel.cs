@@ -30,6 +30,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private readonly ISystemSetup _setup;
     private readonly Action<Action> _runOnUi;
     private readonly ITimer _statsTimer;
+    private readonly ITimer _deviceTimer;
+    private int _knownCameraCount = -1;
     private bool _applyingCapabilities;
 
     public MainViewModel(StreamController controller, IVirtualCameraProvider virtualCameras, ISystemSetup setup,
@@ -62,6 +64,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             ShowState(_controller.State);
         });
         _statsTimer = (time ?? TimeProvider.System).CreateTimer(_ => _runOnUi(UpdateStats), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+
+        _deviceTimer = (time ?? TimeProvider.System).CreateTimer(_ => _runOnUi(CheckDevices), null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
 
         RefreshSetup();
         ShowState(_controller.State);
@@ -98,6 +102,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private int _selectedQuality = 1;
     [ObservableProperty] private bool _isVirtualCameraAvailable;
     [ObservableProperty] private bool _isVirtualCameraOn;
+    [ObservableProperty] private string _microphoneStatus = "";
     [ObservableProperty] private string _virtualCameraStatus = "";
     [ObservableProperty] private bool _isSetupComplete = true;
     [ObservableProperty] private bool _isInstalling;
@@ -207,10 +212,27 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         IsSetupComplete = SetupItems.All(c => c.IsReady);
 
         var devices = _virtualCameras.Find();
+        _knownCameraCount = devices.Count;
         IsVirtualCameraAvailable = devices.Count > 0;
         VirtualCameraStatus = devices.Count > 0
             ? $"{devices[0].Name} · {devices[0].Path}"
             : "Finish the setup above to turn this on.";
+
+        var microphones = _setup.Microphones();
+        MicrophoneStatus = microphones.Count switch
+        {
+            0 => "No microphone found.",
+            1 => $"1 microphone: {microphones[0]}",
+            _ => $"{microphones.Count} microphones: {string.Join(", ", microphones)}",
+        };
+    }
+
+    /// <summary>Every few seconds: when the virtual camera driver appears or disappears (for example after the
+    /// setup finishes or the module loads late), the setup panel updates without restarting MoonCam.</summary>
+    private void CheckDevices()
+    {
+        if (_virtualCameras.Find().Count != _knownCameraCount)
+            RefreshSetup();
     }
 
     /// <summary>Installs whatever is missing. Ubuntu shows its own password dialog; MoonCam never sees the password.</summary>
@@ -393,5 +415,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         StatsText = string.Create(CultureInfo.InvariantCulture, $"{stats.Width}×{stats.Height} · {stats.FramesPerSecond:0} fps{rtt}");
     }
 
-    public void Dispose() => _statsTimer.Dispose();
+    public void Dispose()
+    {
+        _statsTimer.Dispose();
+        _deviceTimer.Dispose();
+    }
 }

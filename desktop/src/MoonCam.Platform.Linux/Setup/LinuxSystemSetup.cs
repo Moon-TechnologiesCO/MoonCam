@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using MoonCam.Core.Setup;
+using MoonCam.Platform.Linux.Audio;
 using MoonCam.Platform.Linux.Video;
 
 namespace MoonCam.Platform.Linux.Setup;
@@ -23,6 +24,8 @@ public sealed class LinuxSystemSetup(Func<bool> isVideoDecoderAvailable, string?
         new("Virtual camera", "Lets every app use your phone as a webcam.", V4l2LoopbackCamera.FindDevices().Count > 0),
         new("Video decoder (FFmpeg)", "Turns the phone's video into pictures.", isVideoDecoderAvailable()),
     ];
+
+    public IReadOnlyList<string> Microphones() => LinuxMicrophones.Find().Select(m => m.Name).ToList();
 
     public async Task<SetupResult> InstallAsync(CancellationToken cancellationToken = default)
     {

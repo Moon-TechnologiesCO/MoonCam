@@ -166,6 +166,7 @@
                                 <ToggleSwitch Content="Use as webcam" IsChecked="{Binding IsVirtualCameraOn}"
                                               IsEnabled="{Binding IsVirtualCameraAvailable}" />
                                 <TextBlock Text="{Binding VirtualCameraStatus}" Classes="muted" FontSize="12" TextWrapping="Wrap" />
+                                <TextBlock Text="{Binding MicrophoneStatus}" Classes="muted" FontSize="12" TextWrapping="Wrap" />
                             </StackPanel>
                         </Border>
                     </StackPanel>
