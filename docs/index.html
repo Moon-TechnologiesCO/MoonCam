@@ -3,246 +3,249 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>MoonCam</title>
+<title>MoonCam — your phone as a webcam and microphone for Linux</title>
 <meta name="description" content="MoonCam turns your Android phone into a webcam and a noise-cancelled microphone for Linux, over USB or Wi-Fi. Local only: no cloud, no account, no telemetry.">
 <link rel="icon" href="img/icon.png">
-<style>
-  @font-face { font-family: "Moon Sans"; src: url(fonts/MoonSans-Regular.ttf) format("truetype"); font-weight: 400; font-display: swap; }
-  @font-face { font-family: "Moon Sans"; src: url(fonts/MoonSans-SemiBold.ttf) format("truetype"); font-weight: 600; font-display: swap; }
-  @font-face { font-family: "Moon Sans"; src: url(fonts/MoonSans-Bold.ttf) format("truetype"); font-weight: 700; font-display: swap; }
-  @font-face { font-family: "Moon Mono"; src: url(fonts/MoonMono-Regular.ttf) format("truetype"); font-weight: 400; font-display: swap; }
-
-  :root {
-    --night: #151845;      /* hero sky */
-    --night-deep: #0d0f30;
-    --moon: #e9ebfb;       /* text on the night sky */
-    --amber: #f5b843;      /* the "live" light */
-    --paper: #f5f6fc;
-    --ink: #1b1f4a;
-    --muted: #5b6084;
-    --line: #dcdff0;
-    --panel: #ffffff;
-    --code-bg: #151845;
-    --code-fg: #e9ebfb;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --paper: #0f1130; --ink: #e9ebfb; --muted: #a3a8cc; --line: #262a5a; --panel: #171a42; --code-bg: #0a0b24;
-    }
-  }
-  :root[data-theme="dark"] { --paper: #0f1130; --ink: #e9ebfb; --muted: #a3a8cc; --line: #262a5a; --panel: #171a42; --code-bg: #0a0b24; }
-
-  * { box-sizing: border-box; }
-  html { scroll-behavior: smooth; }
-  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } * { animation: none !important; } }
-  body { margin: 0; background: var(--paper); color: var(--ink); font: 17px/1.6 "Moon Sans", system-ui, sans-serif; }
-  a { color: inherit; }
-  a:focus-visible, button:focus-visible { outline: 3px solid var(--amber); outline-offset: 3px; border-radius: 6px; }
-  img { max-width: 100%; display: block; }
-  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
-
-  /* Hero: the night sky with the moon rising behind the app. */
-  .hero { background: radial-gradient(circle at 78% 30%, #2a2f78 0, var(--night) 42%, var(--night-deep) 100%); color: var(--moon); overflow: hidden; }
-  .top { display: flex; align-items: center; justify-content: space-between; padding: 22px 0; }
-  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.15rem; text-decoration: none; }
-  .brand img { width: 34px; height: 34px; }
-  .top nav { display: flex; gap: 22px; font-size: .95rem; }
-  .top nav a { text-decoration: none; opacity: .85; }
-  .top nav a:hover { opacity: 1; text-decoration: underline; }
-  .hero-grid { display: grid; grid-template-columns: 1fr 1.15fr; gap: 48px; align-items: center; padding: 48px 0 88px; }
-  .hero h1 { font-size: clamp(2.4rem, 5.4vw, 4rem); line-height: 1.05; letter-spacing: -.02em; margin: 0 0 20px; font-weight: 700; }
-  .hero p { font-size: 1.18rem; color: #c3c7ee; max-width: 32em; margin: 0 0 30px; }
-  .live { display: inline-flex; align-items: center; gap: 8px; font-size: .9rem; color: #c3c7ee; margin-bottom: 22px; }
-  .live::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--amber); box-shadow: 0 0 0 0 rgba(245,184,67,.6); animation: pulse 2.4s infinite; }
-  @keyframes pulse { 70% { box-shadow: 0 0 0 10px rgba(245,184,67,0); } 100% { box-shadow: 0 0 0 0 rgba(245,184,67,0); } }
-  .actions { display: flex; flex-wrap: wrap; gap: 12px; }
-  .btn { display: inline-block; padding: 13px 22px; border-radius: 999px; font-weight: 600; text-decoration: none; }
-  .btn-amber { background: var(--amber); color: #1b1f4a; }
-  .btn-amber:hover { background: #ffc85c; }
-  .btn-ghost { border: 1.5px solid rgba(233,235,251,.45); color: var(--moon); }
-  .btn-ghost:hover { border-color: var(--moon); }
-  .shot { position: relative; }
-  .shot::before { content: ""; position: absolute; width: 78%; aspect-ratio: 1; right: -12%; top: -22%; border-radius: 50%;
-    background: radial-gradient(circle at 35% 35%, #fdfbf2, #d8dcf3 60%, #b9bfe6); opacity: .16; }
-  .shot img { position: relative; border-radius: 14px; box-shadow: 0 30px 70px rgba(0,0,0,.45); border: 1px solid rgba(255,255,255,.12); }
-
-  section { padding: 84px 0; }
-  h2 { font-size: clamp(1.7rem, 3vw, 2.3rem); letter-spacing: -.015em; line-height: 1.15; margin: 0 0 12px; }
-  .intro { color: var(--muted); max-width: 40em; margin: 0 0 40px; font-size: 1.08rem; }
-
-  /* Download: phone and computer side by side. */
-  .get { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
-  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 22px; padding: 30px; min-width: 0; }
-  .btn { white-space: nowrap; }
-  .panel h3 { margin: 0 0 6px; font-size: 1.3rem; }
-  .panel p { color: var(--muted); margin: 0 0 20px; }
-  .phone { display: grid; grid-template-columns: 170px 1fr; gap: 26px; align-items: center; }
-  .qr { background: #fff; border-radius: 16px; padding: 10px; border: 1px solid var(--line); }
-  .btn-ink { background: var(--ink); color: var(--paper); }
-  .small { font-size: .88rem; color: var(--muted); margin-top: 14px; }
-  .cmd { position: relative; background: var(--code-bg); color: var(--code-fg); border-radius: 14px; padding: 18px 18px 18px 18px; font: 14px/1.7 "Moon Mono", ui-monospace, monospace; overflow-x: auto; white-space: pre; margin: 0; }
-  .cmd .p { color: var(--amber); user-select: none; }
-  .copy { margin-top: 12px; font: 600 .9rem "Moon Sans", sans-serif; background: transparent; color: var(--ink); border: 1.5px solid var(--line); border-radius: 999px; padding: 8px 16px; cursor: pointer; }
-  .copy:hover { border-color: var(--ink); }
-
-  /* What it does: plain two-column list, no cards. */
-  .features { display: grid; grid-template-columns: repeat(2, 1fr); gap: 34px 56px; margin: 0; }
-  .features dt { font-weight: 600; font-size: 1.1rem; margin-bottom: 4px; }
-  .features dd { margin: 0; color: var(--muted); }
-  .features div { border-top: 2px solid var(--ink); padding-top: 14px; }
-
-  /* Setup is a real sequence, so it is numbered. */
-  .steps { counter-reset: step; list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; }
-  .steps li { counter-increment: step; }
-  .steps li::before { content: counter(step); display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: var(--amber); color: #1b1f4a; font-weight: 700; margin-bottom: 14px; }
-  .steps h3 { margin: 0 0 6px; font-size: 1.12rem; }
-  .steps p { margin: 0; color: var(--muted); }
-
-  .gallery { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 40px; }
-  .gallery figure { margin: 0; }
-  .gallery img { border-radius: 12px; border: 1px solid var(--line); }
-  .gallery figcaption { font-size: .9rem; color: var(--muted); margin-top: 8px; }
-
-  .band { background: var(--panel); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
-  .privacy { display: grid; grid-template-columns: 1fr 1.3fr; gap: 48px; }
-  .privacy ul { margin: 0; padding-left: 1.1em; color: var(--muted); }
-  .privacy li { margin-bottom: 8px; }
-
-  footer { padding: 40px 0 56px; color: var(--muted); font-size: .92rem; }
-  footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px; }
-  footer nav { display: flex; gap: 20px; flex-wrap: wrap; }
-
-  @media (max-width: 1000px) { .get { grid-template-columns: 1fr; } }
-  @media (max-width: 860px) {
-    .hero-grid, .privacy { grid-template-columns: 1fr; }
-    .hero-grid { padding: 24px 0 64px; gap: 36px; }
-    .features, .steps, .gallery { grid-template-columns: 1fr; }
-    .top nav { display: none; }
-    section { padding: 60px 0; }
-  }
-  @media (max-width: 480px) {
-    .phone { grid-template-columns: 1fr; }
-    .qr { max-width: 200px; }
-    .panel { padding: 22px; }
-  }
-</style>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<header class="hero">
+<nav aria-label="Main">
   <div class="wrap">
-    <div class="top">
-      <a class="brand" href="#"><img src="img/icon.png" alt="">MoonCam</a>
-      <nav aria-label="Sections">
-        <a href="#download">Download</a>
-        <a href="#features">What it does</a>
-        <a href="#setup">Setup</a>
-        <a href="https://github.com/jdswe/MoonCam">Source code</a>
-      </nav>
+    <a class="brand" href="#top"><img src="img/icon.png" alt="">MoonCam</a>
+    <div class="links">
+      <a href="#features" class="optional">Features</a>
+      <a href="#install">Install</a>
+      <a href="#status" class="optional">Status</a>
+      <a href="#faq" class="optional">Questions</a>
+      <a href="https://github.com/jdswe/MoonCam">GitHub</a>
     </div>
-    <div class="hero-grid">
-      <div>
-        <div class="live">Version 0.4 · now with the phone's microphone</div>
-        <h1>Your phone is the best camera you own. Use it on Linux.</h1>
-        <p>MoonCam turns an Android phone into a webcam and a noise-cancelled microphone for your computer, over a USB cable or your Wi-Fi. Everything stays between your phone and your PC.</p>
-        <div class="actions">
-          <a class="btn btn-amber" href="#download">Download MoonCam</a>
-          <a class="btn btn-ghost" href="https://github.com/jdswe/MoonCam">View on GitHub</a>
-        </div>
-      </div>
-      <div class="shot">
-        <img src="screenshots/mooncam-live.png" width="1080" height="700" alt="The MoonCam window on Linux showing the live picture from the phone's camera">
-      </div>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <img class="icon" src="img/icon.png" alt="MoonCam icon" width="132" height="132">
+    <h1>MoonCam</h1>
+    <p>Your Android phone as a webcam and a noise-cancelled microphone for Linux. Over a USB cable or your Wi-Fi, with nothing leaving your home.</p>
+    <a class="badge" href="#releases"><b>v0.4</b> New: the phone's microphone, with noise reduction</a>
+    <div class="actions">
+      <a class="btn btn-primary" href="#install">Download MoonCam</a>
+      <a class="btn btn-ghost" href="https://github.com/jdswe/MoonCam">
+        <svg class="gl" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        View on GitHub</a>
+    </div>
+    <div class="fine">Free and open source · Ubuntu 26.04 and Android 10 or newer</div>
+    <div class="shot">
+      <img src="screenshots/mooncam-live.png" width="1080" height="800" alt="The MoonCam window on Linux showing the live picture from the phone">
     </div>
   </div>
 </header>
 
 <main>
-  <section id="download">
+  <section id="features">
     <div class="wrap">
-      <h2>Download</h2>
-      <p class="intro">You need both parts: the app on your Android phone (Android 10 or newer) and MoonCam on your computer (Ubuntu 26.04).</p>
-      <div class="get">
-        <div class="panel">
-          <h3>On your phone</h3>
+      <h2>Everything a good webcam does</h2>
+      <p class="lead">Every app on your computer sees MoonCam as ordinary hardware, so there is nothing to set up inside OBS, Zoom or Meet.</p>
+      <div class="grid">
+        <div class="card">
+          <span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M15 10l5-3v10l-5-3"/><rect x="3" y="6" width="12" height="12" rx="2.5"/></svg></span>
+          <h3>A real webcam</h3>
+          <p>A camera called "MoonCam" in OBS Studio, Discord, Zoom, Google Meet, Teams and your browser. The driver is signed by Canonical: it works with Secure Boot and needs no reboot.</p>
+        </div>
+        <div class="card">
+          <span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/></svg></span>
+          <h3>The phone's microphone</h3>
+          <p>"MoonCam Microphone" appears in your sound settings. Your computer removes hum and background noise before any app hears it.</p>
+        </div>
+        <div class="card">
+          <span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M2 9a15 15 0 0 1 20 0"/><path d="M5.5 12.5a10 10 0 0 1 13 0"/><path d="M9 16a5 5 0 0 1 6 0"/><circle cx="12" cy="19.5" r=".8"/></svg></span>
+          <h3>USB or Wi-Fi</h3>
+          <p>Plug in a cable, or pair once with a six-digit code shown on both screens. After that the phone connects by itself on networks you trust.</p>
+        </div>
+        <div class="card">
+          <span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3.5"/><path d="M12 3.5v5M20.5 12h-5M12 20.5v-5M3.5 12h5"/></svg></span>
+          <h3>Every lens</h3>
+          <p>Front, back, ultra-wide and telephoto when your phone has them. Choose 480p to 1080p, 30 or 60 frames per second and the quality.</p>
+        </div>
+        <div class="card">
+          <span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="16" height="10" rx="2.5"/><path d="M21 11v2"/><path d="M7 10.5v3M10 10.5v3"/></svg></span>
+          <h3>Easy on the battery</h3>
+          <p>The phone's camera rests while nobody is watching and wakes in about a second when an app opens it.</p>
+        </div>
+        <div class="card">
+          <span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v4h-4"/></svg></span>
+          <h3>Keeps going</h3>
+          <p>If the cable wiggles or the Wi-Fi drops, MoonCam reconnects on its own and skips late frames instead of building up delay.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="install">
+    <div class="wrap">
+      <h2>Install</h2>
+      <p class="lead">You need both parts: the app on your phone and MoonCam on your computer.</p>
+      <div class="two">
+        <div class="card">
+          <h3 class="kind"><span class="ic ic-sm" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M11 18.5h2"/></svg></span>On your phone</h3>
           <div class="phone">
-            <img class="qr" src="img/android-qr.svg" width="170" height="170" alt="QR code that downloads the MoonCam app for Android">
-            <div>
-              <p>Scan the code with your phone's camera, or open this page on the phone and tap the button.</p>
-              <a class="btn btn-ink" href="https://github.com/jdswe/MoonCam/releases/latest/download/mooncam-android.apk">Download for Android</a>
-            </div>
+            <img class="qr" src="img/android-qr.svg" alt="QR code that downloads the MoonCam app for Android">
+            <p>Scan the code with your phone's camera, or open this page on the phone and tap the button.</p>
           </div>
-          <p class="small">The app is not in Google Play yet. When Android asks, allow your browser to install apps, then open the downloaded file.</p>
+          <div class="actions" style="justify-content:flex-start;margin:16px 0 10px">
+            <a class="btn btn-primary" href="https://github.com/jdswe/MoonCam/releases/latest/download/mooncam-android.apk">Download for Android</a>
+          </div>
+          <p class="fine">Android 10 or newer. The app is not in Google Play yet, so Android asks you to allow installing it from your browser.</p>
         </div>
-        <div class="panel">
-          <h3>On your computer</h3>
-          <p>Paste this in a terminal. It downloads the latest release and installs everything MoonCam needs: the .NET runtime, FFmpeg, adb and the signed virtual camera driver.</p>
-<pre class="cmd" id="install"><span class="p">$ </span>curl -fLO https://github.com/jdswe/MoonCam/releases/latest/download/mooncam-linux-amd64.deb
+        <div class="card">
+          <h3 class="kind"><span class="ic ic-sm" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg></span>On your computer</h3>
+          <p>Paste this in a terminal. It downloads the latest release and installs everything MoonCam needs: .NET, FFmpeg, adb and the virtual camera driver.</p>
+<pre class="code" id="cmd"><span class="p">$ </span>curl -fLO https://github.com/jdswe/MoonCam/releases/latest/download/mooncam-linux-amd64.deb
 <span class="p">$ </span>sudo apt install ./mooncam-linux-amd64.deb</pre>
-          <button class="copy" type="button" data-copy="install">Copy commands</button>
-          <p class="small">Prefer clicking? <a href="https://github.com/jdswe/MoonCam/releases/latest/download/mooncam-linux-amd64.deb">Download the .deb</a> and open it with App Center.</p>
+          <button class="copy" type="button" data-copy="cmd">Copy</button>
+          <p class="fine" style="margin-top:12px">Ubuntu 26.04 (64-bit). Prefer clicking? <a href="https://github.com/jdswe/MoonCam/releases/latest/download/mooncam-linux-amd64.deb">Download the .deb</a> and open it with App Center.</p>
         </div>
       </div>
+
+      <div class="card" style="margin-top:24px">
+        <h3 style="margin-top:0">Connect for the first time</h3>
+        <ol class="steps">
+          <li><b>Open MoonCam</b> on the computer and the MoonCam app on the phone.</li>
+          <li><b>By cable:</b> turn on USB debugging in the phone's developer options, plug it in and press <b>Connect via USB</b>. <b>By Wi-Fi:</b> press <b>Pair</b> and check that the six-digit code matches on both screens.</li>
+          <li><b>Pick MoonCam</b> as the camera and <b>MoonCam Microphone</b> as the microphone in Zoom, Meet, Discord or OBS.</li>
+        </ol>
+      </div>
     </div>
   </section>
 
-  <section id="features" class="band">
+  <section id="screenshots">
     <div class="wrap">
-      <h2>What it does</h2>
-      <p class="intro">Every app on your computer sees MoonCam as ordinary hardware, so there is nothing to set up inside OBS, Zoom or Meet.</p>
-      <dl class="features">
-        <div><dt>A real webcam called "MoonCam"</dt><dd>Works in OBS Studio, Discord, Zoom, Google Meet, Teams and your browser. The driver is signed by Canonical, so it works with Secure Boot and needs no reboot.</dd></div>
-        <div><dt>The phone's microphone, cleaned up</dt><dd>"MoonCam Microphone" appears in your sound settings. Your computer filters out hum and background noise before any app hears it.</dd></div>
-        <div><dt>USB or Wi-Fi</dt><dd>Plug in a cable, or pair once with a six-digit code shown on both screens. After that the phone connects on its own whenever MoonCam is open on a network you trust.</dd></div>
-        <div><dt>Every lens on your phone</dt><dd>Front, back, ultra-wide and telephoto when the phone has them. Pick 480p to 1080p, 30 or 60 frames per second, and the quality you want.</dd></div>
-        <div><dt>Easy on the battery</dt><dd>The phone's camera rests while nobody is watching and wakes in about a second when an app opens the camera.</dd></div>
-        <div><dt>Keeps going</dt><dd>If the cable wiggles or the Wi-Fi drops, MoonCam reconnects by itself and skips late frames instead of building up delay.</dd></div>
-      </dl>
-    </div>
-  </section>
-
-  <section id="setup">
-    <div class="wrap">
-      <h2>Set up in three steps</h2>
-      <p class="intro">The first connection takes about two minutes.</p>
-      <ol class="steps">
-        <li><h3>Install both apps</h3><p>MoonCam on the computer with the command above, and the app on the phone with the QR code.</p></li>
-        <li><h3>Connect</h3><p>For USB, turn on USB debugging in the phone's developer options and plug in the cable. For Wi-Fi, press Pair on the computer and confirm the code on the phone.</p></li>
-        <li><h3>Pick MoonCam in your app</h3><p>Choose "MoonCam" as the camera and "MoonCam Microphone" as the microphone in Zoom, Meet, Discord or OBS.</p></li>
-      </ol>
+      <h2>Take a look</h2>
       <div class="gallery">
-        <figure><img src="screenshots/mooncam-waiting.png" width="1080" height="700" alt="MoonCam waiting for a phone, with the connect options" loading="lazy"><figcaption>Waiting for the phone</figcaption></figure>
-        <figure><img src="screenshots/mooncam-pairing.png" width="1080" height="700" alt="Wi-Fi pairing with a six-digit code" loading="lazy"><figcaption>Pairing over Wi-Fi</figcaption></figure>
-        <figure><img src="screenshots/mooncam-trust-network.png" width="1080" height="700" alt="MoonCam asking whether this Wi-Fi network is yours" loading="lazy"><figcaption>Wi-Fi only on networks you trust</figcaption></figure>
+        <figure><img src="screenshots/mooncam-waiting.png" width="1080" height="800" alt="MoonCam waiting for a phone" loading="lazy"><figcaption>Waiting for your phone, with setup checks</figcaption></figure>
+        <figure><img src="screenshots/mooncam-pairing.png" width="1080" height="800" alt="Wi-Fi pairing with a six-digit code" loading="lazy"><figcaption>Pair over Wi-Fi with a code</figcaption></figure>
+        <figure><img src="screenshots/mooncam-trust-network.png" width="1080" height="800" alt="MoonCam asking whether this Wi-Fi network is yours" loading="lazy"><figcaption>Wi-Fi only on networks you trust</figcaption></figure>
       </div>
     </div>
   </section>
 
-  <section class="band">
-    <div class="wrap privacy">
-      <div>
-        <h2>Private by design</h2>
-        <p class="intro">MoonCam has no servers. There is nothing to sign up for and nothing to send.</p>
+  <section id="safety">
+    <div class="wrap">
+      <h2>Private by design</h2>
+      <p class="lead">MoonCam has no servers. There is nothing to sign up for and nothing to send.</p>
+      <div class="grid">
+        <div class="card"><h3>Stays at home</h3><p>Video and sound go only from your phone to your computer, over the cable or your local network.</p></div>
+        <div class="card"><h3>Encrypted Wi-Fi</h3><p>TLS 1.3 with keys pinned at pairing. Only phones you paired can connect.</p></div>
+        <div class="card"><h3>Asks first</h3><p>The phone asks before it streams over USB, and its notification shows whenever the camera or microphone is on.</p></div>
+        <div class="card"><h3>No tracking</h3><p>No account, no telemetry, no crash reports. This site has no cookies. Read the <a href="privacy.html">privacy policy</a>.</p></div>
       </div>
-      <ul>
-        <li>Video and sound go only from your phone to your computer, over the cable or your local network.</li>
-        <li>Wi-Fi connections use TLS 1.3, and only phones you paired can connect.</li>
-        <li>No account, no telemetry, no analytics, no crash reports.</li>
-        <li>This page uses no cookies and loads nothing from other sites. Read the <a href="https://github.com/jdswe/MoonCam/blob/main/PRIVACY.md">privacy notice</a>.</li>
-      </ul>
+    </div>
+  </section>
+
+  <section id="status">
+    <div class="wrap">
+      <h2>What works today</h2>
+      <p class="lead">MoonCam is built in small stages. This is where it stands in version 0.4.</p>
+      <div class="table">
+        <table>
+          <thead><tr><th>Feature</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td>Virtual camera "MoonCam" over USB</td><td class="yes">Ready</td></tr>
+            <tr><td>Wi-Fi pairing, encryption and auto-connect</td><td class="yes">Ready</td></tr>
+            <tr><td>Phone microphone with a noise cancellation switch</td><td class="yes">Ready</td></tr>
+            <tr><td>Lens, resolution, frame rate and quality choice</td><td class="yes">Ready</td></tr>
+            <tr><td>Stronger noise suppression (RNNoise) and lip sync</td><td class="part">In progress</td></tr>
+            <tr><td>Hardware video decoding to save CPU</td><td class="part">In progress</td></tr>
+            <tr><td>Phone mirroring and hand gestures</td><td class="no">Planned</td></tr>
+            <tr><td>Windows and macOS</td><td class="no">Planned</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section id="releases">
+    <div class="wrap">
+      <h2>What's new</h2>
+      <div class="releases">
+        <article class="card release">
+          <header><h3>0.4.0 <span class="latest">Latest</span></h3><time datetime="2026-11-10">November 10, 2026</time></header>
+          <ul>
+            <li>The phone's microphone streams over USB and Wi-Fi to <code>MoonCam Microphone</code>.</li>
+            <li>A <b>Noise cancellation</b> switch on the computer removes hum and background noise, and you can turn it off at any time without dropping the call.</li>
+            <li>Fixed: choosing 480p or 1080p no longer breaks the virtual camera.</li>
+            <li>One download link for each platform that always gets the latest version.</li>
+            <li>Updated libraries and build tools.</li>
+          </ul>
+        </article>
+        <article class="card release">
+          <header><h3>0.1.1</h3><time datetime="2026-11-10">November 10, 2026</time></header>
+          <ul>
+            <li>Detects the computer's microphones and the virtual camera without restarting.</li>
+            <li>Rests the phone's camera while nobody is watching; disconnect and unpair buttons.</li>
+          </ul>
+        </article>
+      </div>
+      <p class="fine" style="margin-top:14px"><a href="https://github.com/jdswe/MoonCam/releases">All releases on GitHub</a></p>
+    </div>
+  </section>
+
+  <section id="faq">
+    <div class="wrap">
+      <h2>Questions</h2>
+      <details><summary>Which apps can use MoonCam?</summary><p>Any app that can use a webcam or a microphone on Linux: OBS Studio, Discord, Zoom, Google Meet and Teams in the browser, Firefox, Chrome and more. Choose "MoonCam" and "MoonCam Microphone" in the app's settings.</p></details>
+      <details><summary>Do I need the internet?</summary><p>Only to download MoonCam. After that, the phone and the computer talk directly over the cable or your own Wi-Fi.</p></details>
+      <details><summary>Why does Android warn me when I install the app?</summary><p>The app is downloaded from this project's GitHub releases instead of Google Play, so Android asks you to allow installs from your browser. The source code is public.</p></details>
+      <details><summary>The camera does not appear in my app</summary><p>Open MoonCam: the setup panel shows what is missing and installs it with one click. Then reopen the app that should use the camera.</p></details>
+      <details><summary>How do I turn noise cancellation on or off?</summary><p>In MoonCam on the computer, use the <b>Noise cancellation</b> switch under Microphone. It takes effect at once, even during a call, and apps keep using "MoonCam Microphone".</p></details>
+      <details><summary>How do I uninstall it?</summary><p>On the computer run <code>sudo apt remove mooncam</code>. On the phone, uninstall it like any other app.</p></details>
     </div>
   </section>
 </main>
 
 <footer>
   <div class="wrap">
-    <span>MoonCam is free and open source under the Apache License 2.0. Made in Colombia.</span>
-    <nav aria-label="Links">
-      <a href="https://github.com/jdswe/MoonCam">Source code</a>
-      <a href="https://github.com/jdswe/MoonCam/releases">All releases</a>
-      <a href="https://github.com/jdswe/MoonCam/issues">Report a problem</a>
-      <a href="https://github.com/jdswe/MoonCam/blob/main/PRIVACY.md">Privacy</a>
-    </nav>
+    <div class="foot">
+      <div>
+        <a class="brand" href="#top"><img src="img/icon.png" alt="">MoonCam</a>
+        <p>Your Android phone as a webcam and a noise-cancelled microphone for Linux. Free, open source and local only.</p>
+        <div class="footer-links">
+          <a href="https://github.com/jdswe/MoonCam"><svg class="gl" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>GitHub</a>
+        </div>
+      </div>
+      <nav aria-label="Product">
+        <h3>Product</h3>
+        <ul>
+          <li><a href="#install">Download</a></li>
+          <li><a href="#features">Features</a></li>
+          <li><a href="#status">What works today</a></li>
+          <li><a href="#faq">Questions</a></li>
+        </ul>
+      </nav>
+      <nav aria-label="Project">
+        <h3>Project</h3>
+        <ul>
+          <li><a href="https://github.com/jdswe/MoonCam/releases">All releases</a></li>
+          <li><a href="https://github.com/jdswe/MoonCam/issues">Report a problem</a></li>
+          <li><a href="https://github.com/jdswe/MoonCam/security/advisories/new">Report a security issue</a></li>
+          <li><a href="https://github.com/jdswe/MoonCam/blob/main/docs/roadmap.md">Roadmap</a></li>
+        </ul>
+      </nav>
+      <nav aria-label="Legal">
+        <h3>Legal</h3>
+        <ul>
+          <li><a href="privacy.html">Privacy policy</a></li>
+          <li><a href="cookies.html">Cookie policy</a></li>
+          <li><a href="terms.html">Terms of use and legal notice</a></li>
+          <li><a href="https://github.com/jdswe/MoonCam/blob/main/LICENSE">License (Apache 2.0)</a></li>
+        </ul>
+      </nav>
+    </div>
+    <div class="legal">
+      <span>© 2026 Jose David Carranza Angarita. Made in Colombia.</span>
+      <span>This site uses no cookies and no tracking. <a href="privacy.html">Privacy</a> · <a href="cookies.html">Cookies</a> · <a href="terms.html">Terms</a></span>
+    </div>
   </div>
 </footer>
 
@@ -253,7 +256,7 @@
         .filter(n => !(n.classList && n.classList.contains("p"))).map(n => n.textContent).join("").trim();
       try { await navigator.clipboard.writeText(text); button.textContent = "Copied"; }
       catch { button.textContent = "Select the text to copy"; }
-      setTimeout(() => (button.textContent = "Copy commands"), 2000);
+      setTimeout(() => (button.textContent = "Copy"), 2000);
     });
   }
 </script>

@@ -53,7 +53,7 @@ and open it. The app is not in Google Play yet, so Android asks you to allow ins
 | USB connection (adb, one-time token, consent prompt on the phone) | ✅ |
 | Wi-Fi connection: pair once with a six-digit code, TLS 1.3, auto-connect on trusted networks | ✅ |
 | Virtual camera "MoonCam" (v4l2loopback, works with Secure Boot, no reboot) | ✅ |
-| Phone microphone as "MoonCam Microphone", with noise reduction on the computer | ✅ new in 0.4 |
+| Phone microphone as "MoonCam Microphone", with a **Noise cancellation** switch on the computer | ✅ new in 0.4 |
 | Front, back, ultra-wide and telephoto lenses; 480p–1080p, 30/60 fps, quality presets | ✅ |
 | Camera rests while nobody watches and wakes in about a second | ✅ |
 | Automatic reconnection, late frames dropped instead of growing delay | ✅ |
