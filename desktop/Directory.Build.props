@@ -7,8 +7,8 @@
     <LangVersion>latest</LangVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <AnalysisLevel>latest</AnalysisLevel>
-    <Company>Moon Technologies</Company>
+    <Company>Jose Carranza</Company>
     <Product>MoonCam</Product>
-    <Version>0.1.0</Version>
+    <Version>0.4.0</Version>
   </PropertyGroup>
 </Project>

@@ -41,7 +41,6 @@
                     <Image Source="avares://mooncam/Assets/mooncam.png" Width="44" Height="44" />
                     <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="MoonCam" FontSize="20" FontWeight="SemiBold" />
-                        <TextBlock Text="by Moon Technologies" Classes="muted" FontSize="11.5" />
                     </StackPanel>
                 </StackPanel>
 

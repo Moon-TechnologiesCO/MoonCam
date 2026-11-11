@@ -63,4 +63,4 @@ and removes the rules when MoonCam is uninstalled. Behind the port, only paired 
 
 ## Reporting vulnerabilities
 
-See the organisation's [security policy](https://github.com/Moon-TechnologiesCO/.github/blob/main/SECURITY.md).
+Report a vulnerability privately through [GitHub security advisories](https://github.com/jdswe/MoonCam/security/advisories/new), not in a public issue.

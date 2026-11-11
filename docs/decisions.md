@@ -38,7 +38,6 @@ devices.
   looks the same everywhere (we draw it; we do not depend on the GTK theme).
 - C# is fast enough for the media plumbing (`Span<T>`, no allocations in hot paths) and talks to native
   libraries (FFmpeg, libc `ioctl`, PipeWire) through P/Invoke.
-- The same stack as other Moon Technologies apps.
 
 **Alternatives:** GTK4/libadwaita (most native on GNOME, weaker on Windows/macOS, and libadwaita resists custom
 styling); Qt/C++ (excellent, but a second language and heavier licensing questions); Electron/Tauri (web UI,
@@ -160,5 +159,5 @@ through scrcpy — unless the app you open on the phone takes the camera itself.
 
 ## D11. Licence: Apache-2.0 (2026-10-23)
 
-Same as the other Moon Open Source projects. Compatible with the libraries we link dynamically (FFmpeg LGPL
+Permissive and widely used. Compatible with the libraries we link dynamically (FFmpeg LGPL
 builds, RNNoise BSD, PipeWire MIT). The **MoonCam** name and logo are trademarks and are not licensed.

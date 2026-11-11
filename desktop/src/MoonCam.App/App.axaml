@@ -3,7 +3,7 @@
              x:Class="MoonCam.App.App"
              RequestedThemeVariant="Dark">
 
-    <!-- Moon Technologies palette and type (brand/BRAND.md). One place for every colour and font. -->
+    <!-- MoonCam palette and type (brand/BRAND.md). One place for every colour and font. -->
     <Application.Resources>
         <FontFamily x:Key="MoonSans">avares://mooncam/Assets/Fonts#Moon Sans</FontFamily>
         <FontFamily x:Key="MoonMono">avares://mooncam/Assets/Fonts#Moon Mono</FontFamily>
