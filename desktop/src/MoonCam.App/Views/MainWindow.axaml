@@ -158,6 +158,14 @@
                         </ComboBox>
                         <TextBlock Classes="muted" FontSize="12" Text="Quality" Margin="4,10,0,4" />
                         <ComboBox ItemsSource="{Binding Qualities}" SelectedIndex="{Binding SelectedQuality}" />
+                        <TextBlock Classes="muted" FontSize="12" Text="Filter" Margin="4,10,0,4" />
+                        <ComboBox ItemsSource="{Binding Filters}" SelectedItem="{Binding SelectedFilter}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:FilterOption">
+                                    <TextBlock Text="{Binding Label}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
                         <TextBlock Classes="muted" FontSize="12" Text="Shape" Margin="4,10,0,4" />
                         <ComboBox ItemsSource="{Binding Shapes}" SelectedItem="{Binding SelectedShape}">
                             <ComboBox.ItemTemplate>
@@ -166,6 +174,26 @@
                                 </DataTemplate>
                             </ComboBox.ItemTemplate>
                         </ComboBox>
+
+                        <TextBlock Classes="section" Text="BACKGROUND" />
+                        <Border Classes="glass">
+                            <StackPanel Spacing="8">
+                                <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding Backgrounds}" SelectedItem="{Binding SelectedBackground}">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:BackgroundOption">
+                                            <TextBlock Text="{Binding Label}" />
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                                <TextBlock Text="{Binding BackgroundHint}" Classes="muted" FontSize="12" TextWrapping="Wrap" />
+                                <Grid ColumnDefinitions="*,8,Auto">
+                                    <Button Grid.Column="0" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                                            Content="Add your own…" Command="{Binding AddBackgroundCommand}" />
+                                    <Button Grid.Column="2" Classes="ghost" Content="Remove" IsVisible="{Binding CanRemoveBackground}"
+                                            Command="{Binding RemoveBackgroundCommand}" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
 
                         <TextBlock Classes="section" Text="LIGHT" />
                         <Border Classes="glass">
@@ -210,6 +238,17 @@
                         <Border Classes="glass">
                             <StackPanel Spacing="6">
                                 <ToggleSwitch Content="Camera mode" IsChecked="{Binding IsCameraMode}" />
+                                <ToggleSwitch Content="Framing grid" IsChecked="{Binding IsGridOn}" />
+                                <StackPanel Spacing="4" IsVisible="{Binding HasComputerCameras}">
+                                    <TextBlock Classes="muted" FontSize="12" Text="Picture from" Margin="0,4,0,0" />
+                                    <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding Sources}" SelectedItem="{Binding SelectedSource}">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:SourceOption">
+                                                <TextBlock Text="{Binding Label}" />
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                </StackPanel>
                                 <TextBlock Text="Shows a shutter and a record button on the picture. The webcam keeps working."
                                            Classes="muted" FontSize="12" TextWrapping="Wrap" />
                                 <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
@@ -236,7 +275,16 @@
             <Border x:Name="PreviewFrame" CornerRadius="22" ClipToBounds="True" Background="#0A0D24"
                     BorderBrush="{StaticResource GlassBorderBrush}" BorderThickness="1">
                 <Grid>
-                    <Image x:Name="PreviewImage" Stretch="Uniform" IsVisible="{Binding IsLive}" />
+                    <!-- The grid sits on the picture itself, whatever its shape, so its lines fall on the thirds. -->
+                    <Viewbox Stretch="Uniform" IsVisible="{Binding IsLive}">
+                        <Grid>
+                            <Image x:Name="PreviewImage" />
+                            <Grid IsVisible="{Binding IsGridOn}" ColumnDefinitions="*,*,*" RowDefinitions="*,*,*" IsHitTestVisible="False">
+                                <Border Grid.Column="1" Grid.RowSpan="3" BorderBrush="#99FFFFFF" BorderThickness="1,0,1,0" />
+                                <Border Grid.Row="1" Grid.ColumnSpan="3" BorderBrush="#99FFFFFF" BorderThickness="0,1,0,1" />
+                            </Grid>
+                        </Grid>
+                    </Viewbox>
 
                     <!-- Waiting state: covers the whole preview, so no stale picture shows through -->
                     <Grid IsVisible="{Binding !IsLive}" Background="#0A0D24">

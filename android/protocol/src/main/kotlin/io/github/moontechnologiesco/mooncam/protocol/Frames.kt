@@ -11,6 +11,8 @@ enum class FrameType(val code: Int) {
     CONTROL(0x04),
     VIDEO_CONFIG(0x10),
     VIDEO_FRAME(0x11),
+    /** Person mask: u16 width, u16 height, then one byte per pixel (255 = person). */
+    MASK(0x12),
     AUDIO_CONFIG(0x20),
     AUDIO_FRAME(0x21),
     PING(0x30),

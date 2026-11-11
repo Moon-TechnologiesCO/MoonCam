@@ -46,7 +46,7 @@ and open it. The app is not in Google Play yet, so Android asks you to allow ins
 **Connect** — for USB, turn on *USB debugging* in the phone's developer options, plug in the cable and press
 **Connect via USB**. For Wi-Fi, press **Pair** on the computer and confirm the six-digit code on the phone.
 
-## What works today (v0.5)
+## What works today (v0.6)
 
 | Feature | Status |
 |---|---|
@@ -57,13 +57,17 @@ and open it. The app is not in Google Play yet, so Android asks you to allow ins
 | Front, back, ultra-wide and telephoto lenses; 480p–1080p, 30/60 fps, quality presets | ✅ |
 | Phone flashlight, brightness and autofocus or manual focus, from the computer | ✅ new in 0.5 |
 | Picture shapes: 16:9, 4:3, square, circle, vertical 9:16, cinema 21:9, rounded corners | ✅ new in 0.5 |
-| Background blur and backgrounds (built-in or your own) | 🚧 next |
+| Background blur, six built-in backgrounds and your own pictures (MediaPipe on the phone) | ✅ new in 0.6 |
+| Camera mode: photos (JPEG) and videos with sound (MP4) in Pictures/MoonCam and Videos/MoonCam | ✅ new in 0.6 |
+| Colour filters (vivid, warm, cool, black and white, noir, sepia, fade) and a framing grid | ✅ new in 0.6 |
+| The computer's own camera when no phone is connected | ✅ new in 0.6 |
+| Hand gestures (for example, a photo when you show your palm) | 🚧 next |
 | Camera rests while nobody watches and wakes in about a second | ✅ |
 | Automatic reconnection, late frames dropped instead of growing delay | ✅ |
 | PC microphones and the virtual camera detected without restarting | ✅ |
 | RNNoise noise suppression and measured lip sync | 🚧 next |
 | Hardware video decoding (VA-API) | 🚧 next |
-| Phone mirroring, hand gestures, Windows and macOS | Planned — see the [roadmap](docs/roadmap.md) |
+| Phone mirroring, Windows and macOS | Planned — see the [roadmap](docs/roadmap.md) |
 
 ## How it works
 
@@ -106,7 +110,7 @@ cd desktop && dotnet test MoonCam.slnx
 cd android && ./gradlew :protocol:test :app:assembleDebug
 
 # Debian package
-packaging/linux/build-deb.sh 0.5.0
+packaging/linux/build-deb.sh 0.6.0
 ```
 
 No phone at hand? `FakePhone` streams a test pattern exactly like the app does:

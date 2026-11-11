@@ -35,7 +35,8 @@ public sealed record CameraInfo(
     bool? HasFlash = null,
     bool? ManualFocus = null);
 
-public sealed record CapabilitiesMessage(IReadOnlyList<CameraInfo> Cameras);
+/// <param name="Segmentation">True when the phone can send person masks (MASK frames) for background effects.</param>
+public sealed record CapabilitiesMessage(IReadOnlyList<CameraInfo> Cameras, bool? Segmentation = null);
 
 /// <summary>Well-known values of <see cref="ControlMessage.Op"/>.</summary>
 public static class ControlOps
@@ -74,7 +75,8 @@ public sealed record ControlMessage(
     bool? Torch = null,
     int? Brightness = null,
     int? Focus = null,
-    bool? AutoFocus = null);
+    bool? AutoFocus = null,
+    bool? Background = null);
 
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,

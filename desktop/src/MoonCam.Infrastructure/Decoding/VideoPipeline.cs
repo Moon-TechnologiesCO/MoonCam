@@ -25,6 +25,9 @@ public sealed class VideoPipeline : IAsyncDisposable
     private readonly Task _worker;
     private ImmutableArray<IVideoSink> _sinks = [];
     private readonly FrameShaper _shaper = new();
+    private readonly FrameFilter _filter = new();
+    private readonly Lock _effectsLock = new();
+    private volatile int _filterKind; // FilterKind
     private volatile int _shape; // FrameShape
     private VideoConfig? _pendingConfig; // a configuration rescued from a drained queue; never lost
     private volatile bool _waitingForKeyFrame = true;
@@ -51,6 +54,38 @@ public sealed class VideoPipeline : IAsyncDisposable
     {
         get => (FrameShape)_shape;
         set => _shape = (int)value;
+    }
+
+    /// <summary>Blurs or replaces the background behind the person (needs masks from the phone).</summary>
+    public BackgroundCompositor Background { get; } = new();
+
+    /// <summary>The colour filter every sink receives.</summary>
+    public FilterKind Filter
+    {
+        get => (FilterKind)_filterKind;
+        set => _filterKind = (int)value;
+    }
+
+    /// <summary>
+    /// Sends an already decoded picture (for example from the computer's own camera) through the same effects
+    /// to every sink. Effects keep one buffer each, so the decoder and this method never run them at once.
+    /// </summary>
+    public void PushPicture(VideoFrame picture)
+    {
+        var output = Process(picture);
+        foreach (var sink in _sinks)
+            Deliver(sink, output);
+    }
+
+    /// <summary>Background, then filter, then shape: what apps, photos and recordings receive.</summary>
+    private VideoFrame Process(VideoFrame picture)
+    {
+        lock (_effectsLock)
+        {
+            var output = Background.Apply(picture);
+            output = _filter.Apply(output, Filter);
+            return _shaper.Apply(output, Shape);
+        }
     }
 
     public long FramesDecoded => Interlocked.Read(ref _decoded);
@@ -135,7 +170,7 @@ public sealed class VideoPipeline : IAsyncDisposable
             foreach (var picture in pictures)
             {
                 Interlocked.Increment(ref _decoded);
-                var shaped = _shaper.Apply(picture, Shape);
+                var shaped = Process(picture);
                 foreach (var sink in _sinks)
                     Deliver(sink, shaped);
                 _decoder.Recycle(picture); // sinks never keep a frame, so its buffer can carry the next one

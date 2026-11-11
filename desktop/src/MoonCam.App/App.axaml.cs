@@ -40,6 +40,9 @@ public sealed class App : Application
                 fixedToken: DevelopmentToken(desktop.Args), log: log, wifi: wifi);
             var setup = new LinuxSystemSetup(() => FfmpegVideoDecoder.IsAvailable);
             var viewModel = new MainViewModel(controller, new LinuxVirtualCameras(), setup, action => Avalonia.Threading.Dispatcher.UIThread.Post(action));
+            viewModel.FindComputerCameras = () => MoonCam.Platform.Linux.Video.LinuxCaptureCameras.Find()
+                .Select(c => (c.Path, c.Name)).ToList();
+            viewModel.ShowSources();
             var window = new MainWindow { DataContext = viewModel };
             controller.AddSink(window.Preview);
             desktop.MainWindow = window;

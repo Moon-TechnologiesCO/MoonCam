@@ -58,6 +58,7 @@ limit: being strict keeps both sides honest and makes bugs visible.
 | `0x11` | `VIDEO_FRAME` | phone → desktop | one encoded access unit (Annex-B for H.264/H.265) |
 | `0x20` | `AUDIO_CONFIG` | phone → desktop | binary: codec, sample rate, channels, codec-specific data |
 | `0x21` | `AUDIO_FRAME` | phone → desktop | one encoded audio packet |
+| `0x12` | `MASK` | phone → desktop | person mask for background effects: u16 width, u16 height (big-endian), then one byte per pixel, 0 = background … 255 = person. Sent only after `adjust` with `background: true`, and only by phones whose `CAPABILITIES` say `segmentation: true` |
 | `0x30` | `PING` | desktop → phone | 8 bytes: `u64` nonce |
 | `0x31` | `PONG` | phone → desktop | the same 8 bytes |
 | `0x3F` | `BYE` | both | JSON: `{ "reason": "..." }`, then the sender closes |
@@ -142,7 +143,7 @@ considers the connection lost. The phone reconnects with exponential back-off (0
 | `start` | desktop → phone | `camera`, `width`, `height`, `fps`, `bitrateBps`, `codec` | start (or restart) streaming |
 | `stop` | desktop → phone | — | stop streaming, keep the session |
 | `keyFrame` | desktop → phone | — | send an IDR as soon as possible |
-| `adjust` | desktop → phone | `torch` (bool), `brightness` (−100…100), `focus` (0 far … 100 closest), `autoFocus` (bool) | flashlight on/off, exposure compensation and manual or automatic focus, applied without restarting the camera; the phone keeps them for the session. Cameras without a flash ignore `torch` (`CameraInfo.hasFlash` says which have one); fixed-focus lenses ignore `focus` (`CameraInfo.manualFocus`) |
+| `adjust` | desktop → phone | `torch` (bool), `brightness` (−100…100), `focus` (0 far … 100 closest), `autoFocus` (bool), `background` (bool: start or stop MASK frames) | flashlight on/off, exposure compensation and manual or automatic focus, applied without restarting the camera; the phone keeps them for the session. Cameras without a flash ignore `torch` (`CameraInfo.hasFlash` says which have one); fixed-focus lenses ignore `focus` (`CameraInfo.manualFocus`) |
 | `status` | phone → desktop | `streaming`, `camera`, `message` | state changes, e.g. "camera busy" |
 | `pairCommit` | phone → desktop | `data` = base64 SHA-256 of the phone's 32-byte nonce | pairing step 1 (§7) |
 | `pairNonce` | desktop → phone | `data` = base64 desktop nonce (32 bytes) | pairing step 2 |

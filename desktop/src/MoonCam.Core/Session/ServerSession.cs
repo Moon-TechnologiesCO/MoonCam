@@ -18,6 +18,9 @@ public interface ISessionHandler
 
     void OnAudioFrame(Frame frame);
 
+    /// <summary>A person mask for background effects; only sent after the desktop asks for it.</summary>
+    void OnMask(Frame frame) { }
+
     void OnControl(ControlMessage message);
 }
 
@@ -182,6 +185,7 @@ public sealed class ServerSession : IAsyncDisposable
             {
                 case FrameType.VideoFrame: _handler.OnVideoFrame(frame); break;
                 case FrameType.AudioFrame: _handler.OnAudioFrame(frame); break;
+                case FrameType.Mask: _handler.OnMask(frame); break;
                 case FrameType.VideoConfig: _handler.OnVideoConfig(VideoConfig.FromFrame(frame)); break;
                 case FrameType.AudioConfig: _handler.OnAudioConfig(AudioConfig.FromFrame(frame)); break;
                 case FrameType.Capabilities: _handler.OnCapabilities(Messages.ReadCapabilities(frame)); break;

@@ -29,6 +29,11 @@ public sealed partial class MainWindow : Window
             if (e.Property == WindowStateProperty)
                 ShowPreviewIfVisible();
         };
+        DataContextChanged += (_, _) =>
+        {
+            if (DataContext is MainViewModel vm)
+                vm.PickImage = PickImageAsync;
+        };
         PreviewFrame.SizeChanged += (_, e) =>
             Preview.SetTargetSize((int)(e.NewSize.Width * RenderScaling), (int)(e.NewSize.Height * RenderScaling));
     }
@@ -39,6 +44,22 @@ public sealed partial class MainWindow : Window
         var shown = WindowState != WindowState.Minimized;
         Preview.IsShown = shown;
         (DataContext as MainViewModel)?.SetPreviewShown(shown);
+    }
+
+    /// <summary>Asks for a background picture with the system's file dialog.</summary>
+    private async Task<string?> PickImageAsync()
+    {
+        var files = await StorageProvider.OpenFilePickerAsync(new Avalonia.Platform.Storage.FilePickerOpenOptions
+        {
+            Title = "Choose a background picture",
+            AllowMultiple = false,
+            FileTypeFilter = [new Avalonia.Platform.Storage.FilePickerFileType("Pictures")
+            {
+                Patterns = ["*.jpg", "*.jpeg", "*.png", "*.webp", "*.bmp"],
+                MimeTypes = ["image/jpeg", "image/png", "image/webp", "image/bmp"],
+            }],
+        });
+        return files.Count > 0 ? Avalonia.Platform.Storage.StorageProviderExtensions.TryGetLocalPath(files[0]) : null;
     }
 
     /// <summary>Receives decoded frames and paints them; registered as a sink by the composition root.</summary>
