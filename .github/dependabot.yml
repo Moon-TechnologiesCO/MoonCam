@@ -1,11 +1,22 @@
+# One grouped pull request per ecosystem each week, instead of one per package and project.
 version: 2
 updates:
   - package-ecosystem: nuget
-    directory: /desktop
+    directories: ["/desktop", "/desktop/src/*", "/desktop/tests/*"]
     schedule: { interval: weekly }
+    groups:
+      nuget: { patterns: ["*"] }
+    ignore:
+      # Avalonia.Headless.XUnit 12.x is built against xUnit v3 3.x; 4.x breaks its test discovery.
+      - dependency-name: xunit.v3
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: gradle
     directory: /android
     schedule: { interval: weekly }
+    groups:
+      gradle: { patterns: ["*"] }
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly }
+    groups:
+      actions: { patterns: ["*"] }
