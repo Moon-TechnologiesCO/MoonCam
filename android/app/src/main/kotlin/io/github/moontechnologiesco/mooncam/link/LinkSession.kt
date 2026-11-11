@@ -8,6 +8,7 @@ import android.util.Log
 import io.github.moontechnologiesco.mooncam.R
 import io.github.moontechnologiesco.mooncam.StreamingState
 import io.github.moontechnologiesco.mooncam.StreamingStatus
+import io.github.moontechnologiesco.mooncam.capture.AudioStreamer
 import io.github.moontechnologiesco.mooncam.capture.CameraCatalog
 import io.github.moontechnologiesco.mooncam.capture.CameraStreamer
 import io.github.moontechnologiesco.mooncam.capture.StreamRequest
@@ -165,6 +166,9 @@ class LinkSession(private val context: Context, target: LinkTarget) {
         val catalog = CameraCatalog(context)
         writer.write(Messages.capabilities(CapabilitiesMessage(catalog.list())))
         val streamer = CameraStreamer(context, catalog, writer, Listener(welcome.serverName, socket))
+        // Microphone: sent on the same connection. Without the permission the camera still streams.
+        val audio = AudioStreamer(context, { frame -> writer.write(frame) }, { socket.close() })
+        audio.start()
         linkWriter = writer
         var unpaired = false
         try {
@@ -187,6 +191,7 @@ class LinkSession(private val context: Context, target: LinkTarget) {
             }
         } finally {
             linkWriter = null
+            audio.stop()
             streamer.release()
             if (wifiLock?.isHeld == true) wifiLock.release()
         }

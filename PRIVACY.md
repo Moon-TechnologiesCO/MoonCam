@@ -5,8 +5,10 @@ account, no telemetry and no analytics. The MoonCam website uses no cookies.
 
 ## What MoonCam does with your data
 
-- **Camera and microphone:** the video (and, when available, the audio) from your phone goes only to your computer,
-  over the USB cable or your local Wi-Fi network. MoonCam does not record it unless an app you choose records it.
+- **Camera and microphone:** the video and the microphone audio from your phone go only to your computer, over the
+  USB cable or your local Wi-Fi network. The phone records its microphone only while MoonCam is connected and
+  streaming; the computer noise-reduces it locally before any app can use it. MoonCam does not store the audio
+  unless an app you choose records it.
 - **Connection:** over Wi-Fi, the phone and the computer use TLS 1.3. You pair them once with a six-digit code shown on
   both screens, and MoonCam connects only to phones you paired.
 - **Pairing data:** paired phones and trusted Wi-Fi networks are stored on your computer only.

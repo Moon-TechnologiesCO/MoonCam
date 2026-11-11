@@ -140,6 +140,7 @@ class MainActivity : ComponentActivity() {
         afterGrant = then
         val wanted = buildList {
             add(Manifest.permission.CAMERA)
+            add(Manifest.permission.RECORD_AUDIO) // the phone's microphone is streamed too
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) add(Manifest.permission.POST_NOTIFICATIONS)
             if (Build.VERSION.SDK_INT >= LOCAL_NETWORK_SDK) add(ACCESS_LOCAL_NETWORK)
         }
