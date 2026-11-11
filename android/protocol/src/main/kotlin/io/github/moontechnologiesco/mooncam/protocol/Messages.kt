@@ -50,7 +50,11 @@ data class CameraInfo(
 )
 
 @Serializable
-data class CapabilitiesMessage(val cameras: List<CameraInfo>)
+data class CapabilitiesMessage(
+    val cameras: List<CameraInfo>,
+    /** True when this phone can send person masks (MASK frames) for background effects. */
+    val segmentation: Boolean? = null,
+)
 
 object ControlOps {
     const val START = "start"
@@ -91,6 +95,8 @@ data class ControlMessage(
     val focus: Int? = null,
     /** `adjust`: true to go back to continuous autofocus. */
     val autoFocus: Boolean? = null,
+    /** `adjust`: true to start sending MASK frames for background effects, false to stop. */
+    val background: Boolean? = null,
 )
 
 /** Builds and reads the JSON-carrying frames. */
@@ -114,6 +120,13 @@ object Messages {
             .put(config.codecData)
             .array()
         return Frame(FrameType.AUDIO_CONFIG, payload)
+    }
+
+    /** MASK: width and height (u16, big-endian), then one byte per pixel from 0 (background) to 255 (person). */
+    fun mask(width: Int, height: Int, pixels: ByteArray, timestampUs: Long): Frame {
+        val payload = ByteBuffer.allocate(4 + pixels.size).order(ByteOrder.BIG_ENDIAN)
+            .putShort(width.toShort()).putShort(height.toShort()).put(pixels).array()
+        return Frame(FrameType.MASK, payload, timestampUs = timestampUs)
     }
 
     /** One AUDIO_FRAME: a packet of 16-bit little-endian PCM. */

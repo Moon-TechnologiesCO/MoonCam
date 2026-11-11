@@ -11,6 +11,8 @@ public enum FrameType : byte
     Control = 0x04,
     VideoConfig = 0x10,
     VideoFrame = 0x11,
+    /// <summary>Person mask for background effects: u16 width, u16 height, then one byte per pixel (255 = person).</summary>
+    Mask = 0x12,
     AudioConfig = 0x20,
     AudioFrame = 0x21,
     Ping = 0x30,

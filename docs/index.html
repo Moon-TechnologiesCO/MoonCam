@@ -28,7 +28,7 @@
     <img class="icon" src="img/icon.png" alt="MoonCam icon" width="132" height="132">
     <h1>MoonCam</h1>
     <p>Your Android phone as a webcam and a noise-cancelled microphone for Linux. Over a USB cable or your Wi-Fi, with nothing leaving your home.</p>
-    <a class="badge" href="#releases"><b>v0.5</b> New: flashlight, brightness, focus and picture shapes</a>
+    <a class="badge" href="#releases"><b>v0.6</b> New: backgrounds, filters, photos and video recording</a>
     <div class="actions">
       <a class="btn btn-primary" href="#install">Download MoonCam</a>
       <a class="btn btn-ghost" href="https://github.com/jdswe/MoonCam">
@@ -72,6 +72,21 @@
           <span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 2h6l-1 6h-4z"/><path d="M10 8v12a2 2 0 0 0 4 0V8"/><path d="M5 5l1.5 1.5M19 5l-1.5 1.5"/></svg></span>
           <h3>Light, brightness and focus</h3>
           <p>Turn on the phone's flashlight from the computer, make the picture brighter or darker, and switch between autofocus and focusing by hand.</p>
+        </div>
+        <div class="card">
+          <span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="9" r="3.5"/><path d="M5 20c1-4 4-6 7-6s6 2 7 6"/><rect x="2.5" y="3" width="19" height="18" rx="3" stroke-dasharray="3 3"/></svg></span>
+          <h3>Backgrounds</h3>
+          <p>Blur what is behind you, pick one of the built-in backgrounds, or add your own pictures. Your phone finds you; the computer paints the rest.</p>
+        </div>
+        <div class="card">
+          <span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="4"/><path d="M4 8h3l2-3h6l2 3h3v11H4z"/></svg></span>
+          <h3>Photos and video</h3>
+          <p>Camera mode adds a shutter and a record button. Photos go to Pictures, videos with sound to Videos. No phone? Use the computer's own camera.</p>
+        </div>
+        <div class="card">
+          <span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17"/><path d="M12 7l5 2M12 12l7 1M12 17l5-1"/></svg></span>
+          <h3>Filters and framing grid</h3>
+          <p>Vivid, warm, cool, black and white, noir, sepia and fade, for calls, photos and videos alike. A rule-of-thirds grid helps you frame the shot.</p>
         </div>
         <div class="card">
           <span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="9" height="12" rx="3"/><circle cx="17" cy="12" r="4.5"/></svg></span>
@@ -167,10 +182,14 @@
             <tr><td>Lens, resolution, frame rate and quality choice</td><td class="yes">Ready</td></tr>
             <tr><td>Flashlight, brightness and focus from the computer</td><td class="yes">Ready</td></tr>
             <tr><td>Picture shapes: 16:9, 4:3, square, circle, 9:16, 21:9, rounded</td><td class="yes">Ready</td></tr>
-            <tr><td>Background blur and backgrounds (built-in or your own)</td><td class="part">Next</td></tr>
+            <tr><td>Background blur, built-in backgrounds and your own pictures</td><td class="yes">Ready</td></tr>
+            <tr><td>Photos and video recording, with a camera mode</td><td class="yes">Ready</td></tr>
+            <tr><td>Colour filters and a framing grid</td><td class="yes">Ready</td></tr>
+            <tr><td>The computer's own camera when no phone is connected</td><td class="yes">Ready</td></tr>
+            <tr><td>Hand gestures (for example, a photo when you show your palm)</td><td class="part">Next</td></tr>
             <tr><td>Stronger noise suppression (RNNoise) and lip sync</td><td class="part">In progress</td></tr>
             <tr><td>Hardware video decoding to save CPU</td><td class="part">In progress</td></tr>
-            <tr><td>Phone mirroring and hand gestures</td><td class="no">Planned</td></tr>
+            <tr><td>Phone mirroring</td><td class="no">Planned</td></tr>
             <tr><td>Windows and macOS</td><td class="no">Planned</td></tr>
           </tbody>
         </table>
@@ -183,7 +202,15 @@
       <h2>What's new</h2>
       <div class="releases">
         <article class="card release">
-          <header><h3>0.5.0 <span class="latest">Latest</span></h3><time datetime="2026-11-11">November 11, 2026</time></header>
+          <header><h3>0.6.0 <span class="latest">Latest</span></h3><time datetime="2026-11-11">November 11, 2026</time></header>
+          <ul>
+            <li>Backgrounds: blur, six built-in pictures, or your own. The phone finds you with Google's MediaPipe; the computer does the rest.</li>
+            <li>Camera mode with a shutter and a record button. Photos and MP4 videos with sound.</li>
+            <li>Colour filters, a framing grid, and the computer's own camera when no phone is connected.</li>
+          </ul>
+        </article>
+        <article class="card release">
+          <header><h3>0.5.0</h3><time datetime="2026-11-11">November 11, 2026</time></header>
           <ul>
             <li>Turn the phone's flashlight on or off from the computer.</li>
             <li>Brightness slider, and autofocus or focus by hand.</li>
@@ -220,6 +247,8 @@
       <details><summary>Why does Android warn me when I install the app?</summary><p>The app is downloaded from this project's GitHub releases instead of Google Play, so Android asks you to allow installs from your browser. The source code is public.</p></details>
       <details><summary>The camera does not appear in my app</summary><p>Open MoonCam: the setup panel shows what is missing and installs it with one click. Then reopen the app that should use the camera.</p></details>
       <details><summary>How do I turn noise cancellation on or off?</summary><p>In MoonCam on the computer, use the <b>Noise cancellation</b> switch under Microphone. It takes effect at once, even during a call, and apps keep using "MoonCam Microphone".</p></details>
+      <details><summary>Where are my photos and videos?</summary><p>In your Pictures/MoonCam and Videos/MoonCam folders. In MoonCam, "Open photos and videos" opens them. Photos and videos include the shape, filter and background you chose.</p></details>
+      <details><summary>Do backgrounds need the internet or an account?</summary><p>No. The phone recognises you on the device with an on-device model, and only a small outline of you travels to your computer over the cable or your Wi-Fi.</p></details>
       <details><summary>How do I uninstall it?</summary><p>On the computer run <code>sudo apt remove mooncam</code>. On the phone, uninstall it like any other app.</p></details>
     </div>
   </section>

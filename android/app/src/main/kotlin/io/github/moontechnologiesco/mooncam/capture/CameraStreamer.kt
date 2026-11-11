@@ -49,7 +49,7 @@ interface StreamerListener {
  * a key frame requested — old video is worse than missing video (docs/architecture.md §6).
  */
 class CameraStreamer(
-    context: Context,
+    private val context: Context,
     private val catalog: CameraCatalog,
     private val writer: FrameWriter,
     private val listener: StreamerListener,
@@ -72,6 +72,11 @@ class CameraStreamer(
     private var brightness = 0
     private var focus: Int? = null // null = continuous autofocus
     private var repeatingFps = 30
+
+    // Background effects: a small second stream feeds the person segmenter while the computer asks for masks.
+    private var background = false
+    private var segmenter: PersonSegmenter? = null
+    private var maskReader: android.media.ImageReader? = null
 
     // Every start/stop begins a new generation. Camera2 delivers callbacks asynchronously, so a callback from
     // an older generation (e.g. "session configured" after we already switched cameras) must be ignored.
@@ -126,6 +131,19 @@ class CameraStreamer(
         if (device != null && captureSession != null) applyRepeating(device, captureSession)
     }
 
+    /** Starts or stops sending person masks. The camera restarts once so the small stream can join or leave. */
+    fun setBackground(on: Boolean) = handler.post {
+        if (on == background) return@post
+        background = on
+        if (!on) {
+            segmenter?.release()
+            segmenter = null
+        }
+        val request = current ?: return@post
+        current = null // force a real restart with the new outputs
+        start(request)
+    }
+
     fun requestKeyFrame() = handler.post {
         encoder?.setParameters(Bundle().apply { putInt(MediaCodec.PARAMETER_KEY_REQUEST_SYNC_FRAME, 0) })
     }
@@ -133,6 +151,8 @@ class CameraStreamer(
     fun release() {
         stop()
         handler.post {
+            segmenter?.release()
+            segmenter = null
             cameraManager.unregisterAvailabilityCallback(availability)
             thread.quitSafely()
         }
@@ -232,8 +252,12 @@ class CameraStreamer(
 
     private fun createSession(gen: Int, device: CameraDevice, physicalId: String?, fps: Int) {
         val surface = inputSurface ?: return
-        val output = OutputConfiguration(surface).apply { physicalId?.let(::setPhysicalCameraId) }
-        val config = SessionConfiguration(SessionConfiguration.SESSION_REGULAR, listOf(output), executor,
+        val outputs = mutableListOf(OutputConfiguration(surface).apply { physicalId?.let(::setPhysicalCameraId) })
+        if (background) {
+            val reader = openMaskReader(physicalId ?: device.id)
+            if (reader != null) outputs += OutputConfiguration(reader.surface).apply { physicalId?.let(::setPhysicalCameraId) }
+        }
+        val config = SessionConfiguration(SessionConfiguration.SESSION_REGULAR, outputs, executor,
             object : CameraCaptureSession.StateCallback() {
                 override fun onConfigured(captureSession: CameraCaptureSession) {
                     if (gen != generation || camera !== device) {
@@ -263,6 +287,7 @@ class CameraStreamer(
             val c = catalog.characteristics(device.id)
             val request = device.createCaptureRequest(CameraDevice.TEMPLATE_RECORD).apply {
                 addTarget(surface)
+                maskReader?.let { addTarget(it.surface) }
                 bestFpsRange(device.id, repeatingFps)?.let { set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, it) }
                 set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON)
                 val hasFlash = c.get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true
@@ -303,6 +328,15 @@ class CameraStreamer(
             ?: Size(request.width, request.height)
     }
 
+    /** Masks skip the video queue: a late mask is simply replaced by the next one. FrameWriter is thread-safe. */
+    private fun sendMask(frame: Frame) {
+        try {
+            writer.write(frame)
+        } catch (e: IOException) {
+            listener.onSendFailed(e)
+        }
+    }
+
     private fun send(frame: Frame, essential: Boolean) {
         if (!essential) {
             if (waitingForKeyFrame && !frame.isKeyFrame) return
@@ -329,11 +363,26 @@ class CameraStreamer(
         }, "mooncam-sender").apply { start() }
     }
 
+    /** The smallest 16:9 YUV stream of at least 256x144, for the segmenter; null if segmentation cannot start. */
+    private fun openMaskReader(cameraId: String): android.media.ImageReader? {
+        val sizes = catalog.characteristics(cameraId).get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
+            ?.getOutputSizes(android.graphics.ImageFormat.YUV_420_888).orEmpty()
+        val size = sizes.filter { it.width * 9 == it.height * 16 && it.width >= PersonSegmenter.WIDTH }
+            .minByOrNull { it.width } ?: sizes.filter { it.width >= PersonSegmenter.WIDTH }.minByOrNull { it.width * it.height }
+            ?: return null
+        val seg = segmenter ?: runCatching { PersonSegmenter(context) { frame -> sendMask(frame) } }
+            .onFailure { android.util.Log.w("MoonCamStreamer", "Segmenter unavailable", it) }
+            .getOrNull()?.also { segmenter = it } ?: return null
+        return seg.createReader(size.width, size.height).also { maskReader = it }
+    }
+
     private fun closeCapture() {
         session?.close()
         session = null
         camera?.close()
         camera = null
+        maskReader?.close()
+        maskReader = null
         encoder?.let {
             runCatching { it.stop() }
             it.release()

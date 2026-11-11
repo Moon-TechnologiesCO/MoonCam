@@ -9,6 +9,10 @@ account, no telemetry and no analytics. The MoonCam website uses no cookies.
   USB cable or your local Wi-Fi network. The phone records its microphone only while MoonCam is connected and
   streaming; the computer noise-reduces it locally before any app can use it. MoonCam does not store the audio
   unless an app you choose records it.
+- **Backgrounds:** with a background effect on, the phone finds you in the picture with an on-device model
+  (Google MediaPipe) and sends only that outline to your computer. Nothing goes to Google or anyone else.
+- **Photos and videos:** saved only when you press the shutter or record button, in Pictures/MoonCam and
+  Videos/MoonCam on your computer. Background pictures you add are copied to `~/.config/mooncam/backgrounds`.
 - **Connection:** over Wi-Fi, the phone and the computer use TLS 1.3. You pair them once with a six-digit code shown on
   both screens, and MoonCam connects only to phones you paired.
 - **Pairing data:** paired phones and trusted Wi-Fi networks are stored on your computer only.
@@ -32,4 +36,4 @@ package and remove the MoonCam settings folder on your computer.
 
 The full policy, with your rights and the legal details, is on the website: https://jdswe.github.io/MoonCam/privacy.html (cookies: https://jdswe.github.io/MoonCam/cookies.html). Questions: open an issue at https://github.com/jdswe/MoonCam/issues.
 
-*Last updated: 2026-11-10.*
+*Last updated: 2026-11-11.*

@@ -11,6 +11,7 @@ import io.github.moontechnologiesco.mooncam.StreamingStatus
 import io.github.moontechnologiesco.mooncam.capture.AudioStreamer
 import io.github.moontechnologiesco.mooncam.capture.CameraCatalog
 import io.github.moontechnologiesco.mooncam.capture.CameraStreamer
+import io.github.moontechnologiesco.mooncam.capture.PersonSegmenter
 import io.github.moontechnologiesco.mooncam.capture.StreamRequest
 import io.github.moontechnologiesco.mooncam.capture.StreamerListener
 import io.github.moontechnologiesco.mooncam.protocol.CapabilitiesMessage
@@ -164,7 +165,8 @@ class LinkSession(private val context: Context, target: LinkTarget) {
         StreamingStatus.linkedOverWifi(pinned)
 
         val catalog = CameraCatalog(context)
-        writer.write(Messages.capabilities(CapabilitiesMessage(catalog.list())))
+        writer.write(Messages.capabilities(CapabilitiesMessage(catalog.list(),
+            segmentation = PersonSegmenter.isAvailable(context).takeIf { it })))
         val streamer = CameraStreamer(context, catalog, writer, Listener(welcome.serverName, socket))
         // Microphone: sent on the same connection. Without the permission the camera still streams.
         val audio = AudioStreamer(context, { frame -> writer.write(frame) }, { socket.close() })
@@ -262,7 +264,10 @@ class LinkSession(private val context: Context, target: LinkTarget) {
                 StreamingStatus.update(StreamingState.Connected(computer))
             }
             ControlOps.KEY_FRAME -> streamer.requestKeyFrame()
-            ControlOps.ADJUST -> streamer.adjust(message.torch, message.brightness, message.focus, message.autoFocus)
+            ControlOps.ADJUST -> {
+                streamer.adjust(message.torch, message.brightness, message.focus, message.autoFocus)
+                message.background?.let(streamer::setBackground)
+            }
         }
     }
 

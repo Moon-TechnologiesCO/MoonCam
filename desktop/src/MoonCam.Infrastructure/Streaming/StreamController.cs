@@ -101,6 +101,40 @@ public sealed class StreamController : IAsyncDisposable
 
     private volatile int _focus = -1; // -1 = autofocus
     private FrameShape _shape = FrameShape.Wide;
+    private FilterKind _filter = FilterKind.None;
+    private BackgroundMode _backgroundMode = BackgroundMode.None;
+    private VideoFrame? _backgroundImage;
+    private volatile bool _phoneSegments;
+
+    /// <summary>The colour filter apps, photos and recordings receive.</summary>
+    public FilterKind Filter
+    {
+        get => _filter;
+        set
+        {
+            _filter = value;
+            if (_pipeline is { } pipeline)
+                pipeline.Filter = value;
+        }
+    }
+
+    /// <summary>True when the connected phone can find the person for background effects.</summary>
+    public bool CanSegment => _phoneSegments;
+
+    /// <summary>Blur or replace the background. Asks the phone to start or stop sending person masks.</summary>
+    public async Task SetBackgroundAsync(BackgroundMode mode, VideoFrame? image = null)
+    {
+        _backgroundMode = mode;
+        _backgroundImage = image;
+        if (_pipeline is { } pipeline)
+        {
+            pipeline.Background.Mode = mode;
+            pipeline.Background.SetImage(image);
+        }
+        _log.Info($"Background: {mode}");
+        if (_phoneSegments && _session?.Handler is Handler { MediaAllowed: true })
+            await SendAsync(AdjustCommand()).ConfigureAwait(false);
+    }
 
     /// <summary>The shape apps and the preview receive: 16:9, 4:3, square, circle or vertical.</summary>
     public FrameShape Shape
@@ -130,7 +164,8 @@ public sealed class StreamController : IAsyncDisposable
     }
 
     private ControlMessage AdjustCommand() => new(ControlOps.Adjust, Torch: _torch, Brightness: _brightness,
-        Focus: Focus, AutoFocus: Focus is null);
+        Focus: Focus, AutoFocus: Focus is null,
+        Background: _phoneSegments ? _backgroundMode != BackgroundMode.None : null);
 
     /// <summary>Whether the phone's microphone is noise-reduced before apps hear it. On by default.</summary>
     public bool NoiseReduction => _noiseReduction;
@@ -225,7 +260,7 @@ public sealed class StreamController : IAsyncDisposable
             return;
         _log.Info("Someone is watching: starting the phone's camera");
         _ = SendAsync(command);
-        if (_torch || _brightness != 0 || Focus is not null)
+        if (_torch || _brightness != 0 || Focus is not null || _backgroundMode != BackgroundMode.None)
             _ = SendAsync(AdjustCommand()); // the phone keeps adjustments for the session; this covers a new one
         VideoDemandChanged?.Invoke();
     }
@@ -280,7 +315,9 @@ public sealed class StreamController : IAsyncDisposable
     /// <summary>Starts listening: 127.0.0.1 for the USB tunnel and, if configured, the LAN for Wi-Fi.</summary>
     public void Start()
     {
-        _pipeline = new VideoPipeline(_decoderFactory()) { Shape = _shape };
+        _pipeline = new VideoPipeline(_decoderFactory()) { Shape = _shape, Filter = _filter };
+        _pipeline.Background.Mode = _backgroundMode;
+        _pipeline.Background.SetImage(_backgroundImage);
         _pipeline.KeyFrameNeeded += () => _ = SendAsync(new ControlMessage(ControlOps.KeyFrame));
         _pipeline.DecodeFailed += e => ReportProblem("Video decoding problem", e);
         _pipeline.SinkFailed += (sink, e) => ReportProblem(
@@ -376,6 +413,8 @@ public sealed class StreamController : IAsyncDisposable
             ((Handler)session.Handler).Session = session;
             if (_session is null)
                 _state.TryMoveTo(ConnectionState.Handshaking);
+            if (_localCamera is not null)
+                _ = UseLocalCameraAsync(null); // the phone takes over from the computer's camera
         };
         server.SessionEnded += OnSessionEnded;
         server.Start();
@@ -395,6 +434,36 @@ public sealed class StreamController : IAsyncDisposable
         lock (_lock)
             _sinks.Remove(sink);
         _pipeline?.RemoveSink(sink);
+    }
+
+    // ===== The computer's own camera =====
+
+    private MoonCam.Infrastructure.Capture.LocalCameraSource? _localCamera;
+
+    /// <summary>True while the computer's own camera feeds MoonCam instead of the phone.</summary>
+    public bool IsUsingLocalCamera => _localCamera is not null;
+
+    /// <summary>Raised when the computer's camera starts or stops (for example when a phone connects).</summary>
+    public event Action? LocalCameraChanged;
+
+    /// <summary>
+    /// Uses one of the computer's cameras (e.g. /dev/video0) as the picture, with every effect, when no phone is
+    /// streaming. Pass null to stop. A phone that connects takes over and the computer's camera stops.
+    /// </summary>
+    public async Task UseLocalCameraAsync(string? device)
+    {
+        if (Interlocked.Exchange(ref _localCamera, null) is { } old)
+            await old.DisposeAsync().ConfigureAwait(false);
+        if (device is not null)
+        {
+            if (_session is not null)
+                throw new InvalidOperationException("A phone is connected. Disconnect it to use the computer's camera.");
+            var pipeline = _pipeline ?? throw new InvalidOperationException("MoonCam has not started yet.");
+            _localCamera = MoonCam.Infrastructure.Capture.LocalCameraSource.Start(device, pipeline.PushPicture,
+                message => { _log.Info($"Computer camera stopped: {message}"); Notice?.Invoke(message); _ = UseLocalCameraAsync(null); });
+            _log.Info($"Using the computer's camera {device}");
+        }
+        LocalCameraChanged?.Invoke();
     }
 
     // ===== Photos and recordings =====
@@ -680,6 +749,7 @@ public sealed class StreamController : IAsyncDisposable
             if (!MediaAllowed)
                 return;
             owner.Capabilities = capabilities;
+            owner._phoneSegments = capabilities.Segmentation == true;
             owner.CapabilitiesChanged?.Invoke(capabilities);
             owner._log.Info($"Cameras: {string.Join(", ", capabilities.Cameras.Select(c => $"{c.Facing}/{c.Lens}#{c.PhysicalId ?? c.Id}"))}");
             owner.ResetVideoDemand();
@@ -725,6 +795,18 @@ public sealed class StreamController : IAsyncDisposable
             catch (Exception e) when (e is IOException or System.ComponentModel.Win32Exception)
             {
                 owner.ReportProblem("Microphone problem", e);
+            }
+        }
+
+        public void OnMask(Frame frame)
+        {
+            if (!MediaAllowed)
+                return;
+            if (owner._pipeline is { } pipeline)
+            {
+                if (!pipeline.Background.HasMask)
+                    owner._log.Info("Person masks are arriving from the phone");
+                pipeline.Background.SetMaskPayload(frame.Payload.Span);
             }
         }
 

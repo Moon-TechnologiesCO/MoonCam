@@ -17,6 +17,15 @@ public sealed record PresetOption(string Label, int Width, int Height, int Fps);
 
 public sealed record ShapeOption(MoonCam.Core.Media.FrameShape Shape, string Label);
 
+public sealed record FilterOption(MoonCam.Core.Media.FilterKind Kind, string Label);
+
+/// <summary>None, blur, a built-in picture or one of the person's own (Path set).</summary>
+public sealed record BackgroundOption(string Label, MoonCam.Core.Media.BackgroundMode Mode,
+    MoonCam.Core.Media.BuiltInBackground? BuiltIn = null, string? Path = null);
+
+/// <summary>Where the picture comes from: the phone (Device null) or one of the computer's cameras.</summary>
+public sealed record SourceOption(string Label, string? Device);
+
 public sealed record PairedPhoneOption(string Name, string FingerprintHex, string Detail);
 
 public sealed record TrustedNetworkOption(string Name, string Id, string Detail);
@@ -53,6 +62,13 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _controller.CapabilitiesChanged += caps => _runOnUi(() => ShowCameras(caps));
         _controller.Notice += text => _runOnUi(() => Notice = text);
         _controller.VideoDemandChanged += () => _runOnUi(() => ShowState(_controller.State));
+        _controller.LocalCameraChanged += () => _runOnUi(() =>
+        {
+            ShowState(_controller.State);
+            if (!_controller.IsUsingLocalCamera && SelectedSource?.Device is not null && Sources.Count > 0)
+                SelectedSource = Sources[0];
+        });
+        _controller.CapabilitiesChanged += _ => _runOnUi(UpdateBackgroundHint);
         if (_controller.Pairing is { } pairing)
         {
             pairing.Changed += () => _runOnUi(ShowPairing);
@@ -70,6 +86,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _deviceTimer = (time ?? TimeProvider.System).CreateTimer(_ => _runOnUi(CheckDevices), null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
 
         RefreshSetup();
+        ShowBackgrounds();
         ShowState(_controller.State);
         ShowPairing();
         ShowPairedPhones();
@@ -114,6 +131,12 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string _recordingTime = "";
     [ObservableProperty] private bool _isCapturing;
     [ObservableProperty] private ShapeOption _selectedShape = Shapes[0];
+    [ObservableProperty] private FilterOption _selectedFilter = Filters[0];
+    [ObservableProperty] private BackgroundOption? _selectedBackground;
+    [ObservableProperty] private string _backgroundHint = "";
+    [ObservableProperty] private bool _isGridOn;
+    [ObservableProperty] private SourceOption? _selectedSource;
+    [ObservableProperty] private bool _hasComputerCameras;
     [ObservableProperty] private double _focusDistance = 30;
     [ObservableProperty] private string _virtualCameraStatus = "";
     [ObservableProperty] private bool _isSetupComplete = true;
@@ -318,6 +341,136 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     partial void OnSelectedShapeChanged(ShapeOption value) => _controller.Shape = value.Shape;
 
+    public static IReadOnlyList<FilterOption> Filters { get; } =
+    [
+        new(MoonCam.Core.Media.FilterKind.None, "No filter"),
+        new(MoonCam.Core.Media.FilterKind.Vivid, "Vivid"),
+        new(MoonCam.Core.Media.FilterKind.Warm, "Warm"),
+        new(MoonCam.Core.Media.FilterKind.Cool, "Cool"),
+        new(MoonCam.Core.Media.FilterKind.Mono, "Black and white"),
+        new(MoonCam.Core.Media.FilterKind.Noir, "Noir"),
+        new(MoonCam.Core.Media.FilterKind.Sepia, "Sepia"),
+        new(MoonCam.Core.Media.FilterKind.Fade, "Fade"),
+    ];
+
+    partial void OnSelectedFilterChanged(FilterOption value) => _controller.Filter = value.Kind;
+
+    // ----- Backgrounds -----
+
+    private readonly MoonCam.Infrastructure.Capture.BackgroundLibrary _backgrounds = new();
+
+    public ObservableCollection<BackgroundOption> Backgrounds { get; } = [];
+
+    /// <summary>Set by the window: opens a file picker and returns the chosen picture, or null.</summary>
+    public Func<Task<string?>>? PickImage { get; set; }
+
+    private void ShowBackgrounds(string? select = null)
+    {
+        var keep = select ?? SelectedBackground?.Path ?? SelectedBackground?.BuiltIn?.Id ?? SelectedBackground?.Label;
+        Backgrounds.Clear();
+        Backgrounds.Add(new("No background effect", MoonCam.Core.Media.BackgroundMode.None));
+        Backgrounds.Add(new("Blur", MoonCam.Core.Media.BackgroundMode.Blur));
+        foreach (var b in MoonCam.Core.Media.BuiltInBackgrounds.All)
+            Backgrounds.Add(new(b.Name, MoonCam.Core.Media.BackgroundMode.Image, BuiltIn: b));
+        foreach (var path in _backgrounds.All())
+            Backgrounds.Add(new($"Mine: {Path.GetFileNameWithoutExtension(path)}", MoonCam.Core.Media.BackgroundMode.Image, Path: path));
+        SelectedBackground = Backgrounds.FirstOrDefault(o => o.Path == keep || o.BuiltIn?.Id == keep || o.Label == keep) ?? Backgrounds[0];
+        UpdateBackgroundHint();
+    }
+
+    private void UpdateBackgroundHint() => BackgroundHint = SelectedBackground?.Mode is null or MoonCam.Core.Media.BackgroundMode.None
+        ? "Blur or replace what is behind you. Your phone finds you in the picture."
+        : !IsPhoneConnected ? "Works with the phone's camera: connect it to see the effect."
+        : _controller.CanSegment ? "Your phone finds you; the computer paints the background."
+        : "Update the MoonCam app on your phone (0.6 or newer) to use backgrounds.";
+
+    partial void OnSelectedBackgroundChanged(BackgroundOption? value) => _ = ApplyBackgroundAsync(value);
+
+    private async Task ApplyBackgroundAsync(BackgroundOption? option)
+    {
+        UpdateBackgroundHint();
+        OnPropertyChanged(nameof(CanRemoveBackground));
+        if (option is null)
+            return;
+        try
+        {
+            MoonCam.Core.Media.VideoFrame? image = option switch
+            {
+                { BuiltIn: { } builtIn } => await Task.Run(() => builtIn.Draw(1280, 720)),
+                { Path: { } path } => await MoonCam.Infrastructure.Capture.BackgroundLibrary.LoadAsync(path),
+                _ => null,
+            };
+            await _controller.SetBackgroundAsync(option.Mode, image);
+        }
+        catch (Exception e) when (e is IOException or InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            Notice = e.Message;
+        }
+    }
+
+    [RelayCommand]
+    private async Task AddBackgroundAsync()
+    {
+        if (PickImage is null || await PickImage() is not { } file)
+            return;
+        try
+        {
+            var copy = _backgrounds.Add(file);
+            ShowBackgrounds(copy);
+            Notice = "Background added. It is saved in MoonCam, so you can delete the original.";
+        }
+        catch (Exception e) when (e is IOException or InvalidOperationException or UnauthorizedAccessException)
+        {
+            Notice = e.Message;
+        }
+    }
+
+    [RelayCommand]
+    private void RemoveBackground()
+    {
+        if (SelectedBackground?.Path is not { } path)
+            return;
+        _backgrounds.Remove(path);
+        ShowBackgrounds(MoonCam.Core.Media.BackgroundMode.None.ToString());
+    }
+
+    public bool CanRemoveBackground => SelectedBackground?.Path is not null;
+
+    // ----- Picture source: the phone or the computer's camera -----
+
+    public ObservableCollection<SourceOption> Sources { get; } = [];
+
+    /// <summary>Set at startup: the computer's own cameras (path and name).</summary>
+    public Func<IReadOnlyList<(string Path, string Name)>>? FindComputerCameras { get; set; }
+
+    public void ShowSources()
+    {
+        Sources.Clear();
+        Sources.Add(new("Phone", null));
+        foreach (var (path, name) in FindComputerCameras?.Invoke() ?? [])
+            Sources.Add(new($"This computer: {name}", path));
+        HasComputerCameras = Sources.Count > 1;
+        SelectedSource = Sources.FirstOrDefault(s => s.Device is not null && _controller.IsUsingLocalCamera) ?? Sources[0];
+    }
+
+    partial void OnSelectedSourceChanged(SourceOption? value) => _ = UseSourceAsync(value);
+
+    private async Task UseSourceAsync(SourceOption? source)
+    {
+        if (source is null || (source.Device is null) == !_controller.IsUsingLocalCamera)
+            return;
+        try
+        {
+            await _controller.UseLocalCameraAsync(source.Device);
+            Notice = source.Device is null ? "Using the phone." : $"Using {source.Label.Replace("This computer: ", "")}. Connect a phone to switch back.";
+        }
+        catch (Exception e) when (e is IOException or InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            Notice = e.Message;
+            SelectedSource = Sources[0];
+        }
+    }
+
     /// <summary>True when the chosen lens can focus by hand.</summary>
     public bool IsManualFocusAvailable => SelectedCamera?.ManualFocus == true;
 
@@ -390,7 +543,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     private void ShowState(ConnectionState state)
     {
-        IsLive = state == ConnectionState.Streaming;
+        IsLive = state == ConnectionState.Streaming || _controller.IsUsingLocalCamera;
         IsWaiting = state is ConnectionState.Listening or ConnectionState.Reconnecting or ConnectionState.Stopped or ConnectionState.Handshaking;
         IsPhoneConnected = state is ConnectionState.Connected or ConnectionState.Streaming;
         var via = _controller.CurrentTransport switch { Transport.WiFi => " · Wi-Fi", Transport.Usb => " · USB", _ => "" };
@@ -408,6 +561,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             ConnectionState.Reconnecting => ("Reconnecting…", "The connection dropped. MoonCam is waiting for your phone to come back."),
             _ => ("Stopped", ""),
         };
+        UpdateBackgroundHint();
     }
 
     private void ShowPairing()

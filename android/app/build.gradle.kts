@@ -11,8 +11,14 @@ android {
         applicationId = "io.github.moontechnologiesco.mooncam"
         minSdk = 29 // Android 10: Opus encoder, microphone direction hints, modern camera APIs
         targetSdk = 37
-        versionCode = 5
-        versionName = "0.5.0"
+        versionCode = 6
+        versionName = "0.6.0"
+        // MediaPipe ships native code: phones only (64- and 32-bit ARM), which keeps the APK about 20 MB smaller.
+        ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
+    }
+
+    androidResources {
+        noCompress += "tflite" // MediaPipe maps the model straight from the APK
     }
 
     buildTypes {
@@ -39,6 +45,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.service)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.mediapipe.tasks.vision) // person segmentation for background effects (Apache-2.0)
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.material3)
     implementation(libs.compose.ui)
