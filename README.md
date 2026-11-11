@@ -4,57 +4,73 @@
 
 <h1 align="center">MoonCam</h1>
 
-<p align="center"><b>Your Android phone as a webcam and microphone for Linux.</b><br>
-Local only · no cloud · no account · no telemetry</p>
+<p align="center"><b>Your Android phone as a webcam and noise-cancelled microphone for Linux.</b><br>
+Over USB or Wi-Fi. Local only: no cloud, no account, no telemetry.</p>
 
 <p align="center">
-  <img src="docs/screenshots/mooncam-live.png" width="760" alt="MoonCam streaming a phone camera">
+  <a href="https://jdswe.github.io/MoonCam/"><b>Website</b></a> ·
+  <a href="https://github.com/jdswe/MoonCam/releases/latest"><b>Download</b></a> ·
+  <a href="docs/roadmap.md">Roadmap</a> ·
+  <a href="PRIVACY.md">Privacy</a>
 </p>
 
-MoonCam turns an Android phone into a **real webcam** for your computer. The picture appears as a camera
-called **"MoonCam"** in OBS Studio, Discord, Zoom, Google Meet, Teams and your browser — over a USB cable or
-over Wi-Fi.
+<p align="center">
+  <a href="https://github.com/jdswe/MoonCam/actions/workflows/ci.yml"><img src="https://github.com/jdswe/MoonCam/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/jdswe/MoonCam/releases/latest"><img src="https://img.shields.io/github/v/release/jdswe/MoonCam" alt="Latest release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue" alt="Apache-2.0"></a>
+</p>
 
-> **Status:** Stage 2 of 6 — USB, preview and the virtual camera work end to end; Wi-Fi pairing is in testing.
-> See the [roadmap](docs/roadmap.md).
-> Linux (Ubuntu 26.04) and Android 10+.
+<p align="center">
+  <img src="docs/screenshots/mooncam-live.png" width="760" alt="The MoonCam window showing the phone's camera">
+</p>
 
-## Features
+MoonCam turns an Android phone into a **real webcam and microphone** for your computer. The picture appears as a
+camera called **"MoonCam"** and the sound as **"MoonCam Microphone"** in OBS Studio, Discord, Zoom, Google Meet,
+Teams and your browser.
 
-- **USB connection** through ADB, with a one-time token and a consent prompt on the phone
-- **Wi-Fi connection** over TLS 1.3: pair once with a six-digit code shown on both screens, then the phone
-  connects on its own whenever MoonCam is open on the same network
-- **Live preview** in a macOS-style window, with the Moon type family
-- **Virtual camera** (v4l2loopback, Canonical-signed module: works with Secure Boot, no reboot)
-- **Front, back, ultra-wide and telephoto** lenses, when the phone exposes them
-- **Resolution, frame rate and quality** presets (480p–1080p, 30/60 fps)
-- **Light on power**: the phone's camera rests while nobody watches (window minimised and no app using the
-  camera) and wakes in about a second when someone does
-- **Resilient**: heartbeats, automatic reconnection, frame dropping instead of growing delay
-- Coming next: microphone with noise suppression, phone mirroring, hand gestures
+## Install
 
-## Install (Ubuntu 26.04)
+You need both parts. Ubuntu 26.04 on the computer, Android 10 or newer on the phone.
 
-Download `mooncam_<version>_amd64.deb` from [Releases](../../releases) and open it, or:
+**Computer** — one command downloads the latest release and installs everything MoonCam needs (the .NET runtime,
+FFmpeg, adb and the Canonical-signed virtual camera driver):
 
 ```bash
-sudo apt install ./mooncam_0.1.0_amd64.deb
+curl -fLO https://github.com/jdswe/MoonCam/releases/latest/download/mooncam-linux-amd64.deb && sudo apt install ./mooncam-linux-amd64.deb
 ```
 
-That single step installs and configures everything MoonCam needs — the .NET runtime, FFmpeg, adb and the
-signed virtual camera driver. Open MoonCam from your apps and it is ready.
+**Phone** — scan the QR code on the [website](https://jdswe.github.io/MoonCam/#download), or download
+[`mooncam-android.apk`](https://github.com/jdswe/MoonCam/releases/latest/download/mooncam-android.apk) on the phone
+and open it. The app is not in Google Play yet, so Android asks you to allow installing it.
 
-On the phone, install the MoonCam app, turn on **USB debugging** (Settings → Developer options), plug in the
-cable and press **Connect via USB** on the computer.
+**Connect** — for USB, turn on *USB debugging* in the phone's developer options, plug in the cable and press
+**Connect via USB**. For Wi-Fi, press **Pair** on the computer and confirm the six-digit code on the phone.
+
+## What works today (v0.4)
+
+| Feature | Status |
+|---|---|
+| USB connection (adb, one-time token, consent prompt on the phone) | ✅ |
+| Wi-Fi connection: pair once with a six-digit code, TLS 1.3, auto-connect on trusted networks | ✅ |
+| Virtual camera "MoonCam" (v4l2loopback, works with Secure Boot, no reboot) | ✅ |
+| Phone microphone as "MoonCam Microphone", with noise reduction on the computer | ✅ new in 0.4 |
+| Front, back, ultra-wide and telephoto lenses; 480p–1080p, 30/60 fps, quality presets | ✅ |
+| Camera rests while nobody watches and wakes in about a second | ✅ |
+| Automatic reconnection, late frames dropped instead of growing delay | ✅ |
+| PC microphones and the virtual camera detected without restarting | ✅ |
+| RNNoise noise suppression and measured lip sync | 🚧 next |
+| Hardware video decoding (VA-API) | 🚧 next |
+| Phone mirroring, hand gestures, Windows and macOS | Planned — see the [roadmap](docs/roadmap.md) |
 
 ## How it works
 
 ```mermaid
 flowchart LR
-  P["Android phone<br/>Camera2 → H.264 (MediaCodec)"] -- "MoonLink over USB (adb reverse)" --> D["MoonCam desktop<br/>FFmpeg decode"]
-  D --> V["Virtual camera<br/>v4l2loopback"]
-  D --> U["Preview"]
+  P["Android phone<br/>Camera2 → H.264 · microphone → PCM"] -- "MoonLink over USB (adb reverse) or Wi-Fi (TLS 1.3)" --> D["MoonCam desktop"]
+  D -- "FFmpeg decode" --> V["Virtual camera<br/>v4l2loopback"]
+  D -- "FFmpeg denoise → PipeWire" --> M["MoonCam Microphone"]
   V --> A["OBS · Discord · Zoom · Meet"]
+  M --> A
 ```
 
 | Read | What it covers |
@@ -65,31 +81,29 @@ flowchart LR
 | [Security](docs/security.md) | Threat model, pairing, consent, least privilege |
 | [Research](docs/research.md) | Cameras, dual microphones, noise suppression, gestures, mirroring |
 | [Engineering](docs/engineering.md) | Code standards, testing, security practices |
+| [Roadmap](docs/roadmap.md) | Stages and what is next |
 
 ## Repository
 
 ```
-android/      Kotlin: protocol (pure JVM) + app (Camera2, MediaCodec, Compose)
+android/      Kotlin: protocol (pure JVM) + app (Camera2, MediaCodec, AudioRecord, Compose)
 desktop/      C# / .NET 10: Core, Infrastructure, Platform.Linux, App (Avalonia 12), FakePhone tool, tests
 protocol/     Shared MoonLink test vectors used by both test suites
 packaging/    Debian package and the privileged setup helper
-docs/         Architecture, decisions, protocol, security, research, roadmap
+docs/         The website (index.html) and the design documents
 ```
 
 ## Build and test
 
 ```bash
-# Desktop (needs the .NET 10 SDK and FFmpeg)
+# Desktop (needs the .NET 10 SDK, FFmpeg and PipeWire)
 cd desktop && dotnet test MoonCam.slnx
 
-# Android protocol (needs JDK 17+)
-cd android && ./gradlew :protocol:test
-
-# Android app (needs the Android SDK)
-cd android && ./gradlew :app:assembleDebug
+# Android protocol and app (needs JDK 21 and the Android SDK)
+cd android && ./gradlew :protocol:test :app:assembleDebug
 
 # Debian package
-packaging/linux/build-deb.sh 0.1.0
+packaging/linux/build-deb.sh 0.4.0
 ```
 
 No phone at hand? `FakePhone` streams a test pattern exactly like the app does:
@@ -99,21 +113,32 @@ dotnet run --project desktop/src/MoonCam.App -- --dev-token dev-demo-token-for-t
 dotnet run --project desktop/src/MoonCam.Tools.FakePhone -- --token dev-demo-token-for-testing-only-0001
 ```
 
+Releases are cut from `main` with a `vX.Y.Z` tag; each one carries `mooncam-linux-amd64.deb` and
+`mooncam-android.apk` under fixed names, so the download links above always point to the latest version.
+
 ## License
 
-Code: [Apache-2.0](LICENSE). The **MoonCam** and **Moon Technologies** names and logos are trademarks and are not
-covered by the license (see [NOTICE](NOTICE)). Fonts: SIL OFL 1.1.
+Code: [Apache-2.0](LICENSE). The MoonCam name and icon are not covered by the license (see [NOTICE](NOTICE)).
+Fonts: SIL OFL 1.1.
 
 ---
 
 ## Español
 
-**MoonCam** convierte tu teléfono Android en la **cámara web** de tu computador con Linux. La imagen aparece como
-una cámara llamada **"MoonCam"** en OBS, Discord, Zoom, Meet y el navegador. Todo es local: sin nube, sin cuenta,
-sin telemetría.
+**MoonCam** convierte tu teléfono Android en la **cámara web y el micrófono** de tu computador con Linux, por cable
+USB o por Wi-Fi. La imagen aparece como la cámara **"MoonCam"** y el sonido como **"MoonCam Microphone"** (con
+cancelación de ruido) en OBS, Discord, Zoom, Meet y el navegador. Todo es local: sin nube, sin cuenta, sin telemetría.
 
-**Instalar:** abre el archivo `.deb` de [Releases](../../releases) (o `sudo apt install ./mooncam_0.1.0_amd64.deb`).
-Ese único paso instala y configura todo lo necesario. En el teléfono activa la **depuración USB**, conecta el cable y
-pulsa **Connect via USB** en el computador; el teléfono te pedirá permiso antes de transmitir.
+**Instalar en el computador** (Ubuntu 26.04):
 
-Hecho con amor en Colombia por **Moon Technologies** — parte de Moon Open Source.
+```bash
+curl -fLO https://github.com/jdswe/MoonCam/releases/latest/download/mooncam-linux-amd64.deb && sudo apt install ./mooncam-linux-amd64.deb
+```
+
+**Instalar en el teléfono:** escanea el código QR de la [página web](https://jdswe.github.io/MoonCam/#download) o
+descarga [`mooncam-android.apk`](https://github.com/jdswe/MoonCam/releases/latest/download/mooncam-android.apk).
+
+**Conectar:** por USB, activa la *depuración USB*, conecta el cable y pulsa **Connect via USB**. Por Wi-Fi, pulsa
+**Pair** en el computador y confirma el código de seis dígitos en el teléfono.
+
+Hecho en Colombia por [Jose Carranza](https://github.com/jdswe).
