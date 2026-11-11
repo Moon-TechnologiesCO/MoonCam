@@ -206,6 +206,17 @@
                             </StackPanel>
                         </Border>
 
+                        <TextBlock Classes="section" Text="PHOTOS AND VIDEO" />
+                        <Border Classes="glass">
+                            <StackPanel Spacing="6">
+                                <ToggleSwitch Content="Camera mode" IsChecked="{Binding IsCameraMode}" />
+                                <TextBlock Text="Shows a shutter and a record button on the picture. The webcam keeps working."
+                                           Classes="muted" FontSize="12" TextWrapping="Wrap" />
+                                <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                                        Content="Open photos and videos" Command="{Binding OpenCapturesCommand}" />
+                            </StackPanel>
+                        </Border>
+
                         <TextBlock Classes="section" Text="MICROPHONE" />
                         <Border Classes="glass">
                             <StackPanel Spacing="6">
@@ -283,6 +294,29 @@
                             <Button Classes="ghost" HorizontalAlignment="Center" HorizontalContentAlignment="Center" MinWidth="120" Content="Cancel" Command="{Binding CancelTrustCommand}" />
                         </StackPanel>
                     </Grid>
+
+                    <!-- Camera mode: shutter and record buttons over the picture -->
+                    <Border IsVisible="{Binding IsCameraMode}" HorizontalAlignment="Center" VerticalAlignment="Bottom"
+                            Margin="0,0,0,22" Background="#B30B1026" CornerRadius="999" Padding="10,8">
+                        <StackPanel Orientation="Horizontal" Spacing="14">
+                            <Button Classes="ghost" Width="56" Height="56" CornerRadius="28" Padding="0"
+                                    HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                                    Command="{Binding TakePhotoCommand}" IsEnabled="{Binding !IsCapturing}"
+                                    ToolTip.Tip="Take a photo">
+                                <Ellipse Width="34" Height="34" Fill="White" />
+                            </Button>
+                            <Button Classes="ghost" Width="56" Height="56" CornerRadius="28" Padding="0"
+                                    HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                                    Command="{Binding ToggleRecordingCommand}" ToolTip.Tip="Start or stop recording">
+                                <Panel>
+                                    <Ellipse Width="30" Height="30" Fill="{StaticResource LiveBrush}" IsVisible="{Binding !IsRecording}" />
+                                    <Rectangle Width="22" Height="22" RadiusX="5" RadiusY="5" Fill="{StaticResource LiveBrush}" IsVisible="{Binding IsRecording}" />
+                                </Panel>
+                            </Button>
+                            <TextBlock Text="{Binding RecordingTime}" IsVisible="{Binding IsRecording}" Classes="mono"
+                                       FontSize="15" VerticalAlignment="Center" Margin="0,0,8,0" />
+                        </StackPanel>
+                    </Border>
 
                     <!-- LIVE badge -->
                     <Border IsVisible="{Binding IsLive}" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="16"

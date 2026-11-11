@@ -109,6 +109,10 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private bool _isTorchOn;
     [ObservableProperty] private double _brightness;
     [ObservableProperty] private bool _isAutoFocus = true;
+    [ObservableProperty] private bool _isCameraMode;
+    [ObservableProperty] private bool _isRecording;
+    [ObservableProperty] private string _recordingTime = "";
+    [ObservableProperty] private bool _isCapturing;
     [ObservableProperty] private ShapeOption _selectedShape = Shapes[0];
     [ObservableProperty] private double _focusDistance = 30;
     [ObservableProperty] private string _virtualCameraStatus = "";
@@ -478,8 +482,81 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         }).ToList();
     }
 
+    /// <summary>Saves what apps see right now to ~/Pictures/MoonCam.</summary>
+    [RelayCommand]
+    private async Task TakePhotoAsync()
+    {
+        IsCapturing = true;
+        try
+        {
+            var path = await _controller.TakePhotoAsync();
+            Notice = $"Photo saved: {Path.GetFileName(path)} in Pictures/MoonCam";
+        }
+        catch (Exception e) when (e is IOException or InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            Notice = e.Message;
+        }
+        finally
+        {
+            IsCapturing = false;
+        }
+    }
+
+    /// <summary>Starts or stops recording to ~/Videos/MoonCam, with the phone's microphone when it streams.</summary>
+    [RelayCommand]
+    private async Task ToggleRecordingAsync()
+    {
+        try
+        {
+            if (_controller.IsRecording)
+            {
+                IsRecording = false;
+                RecordingTime = "";
+                var path = await _controller.StopRecordingAsync();
+                if (path is not null)
+                    Notice = $"Video saved: {Path.GetFileName(path)} in Videos/MoonCam";
+            }
+            else
+            {
+                await _controller.StartRecordingAsync();
+                IsRecording = true;
+                RecordingTime = "0:00";
+                Notice = "Recording… press Stop to save the video.";
+            }
+        }
+        catch (Exception e) when (e is IOException or InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            IsRecording = _controller.IsRecording;
+            Notice = e.Message;
+        }
+    }
+
+    /// <summary>Opens the folder with MoonCam's photos and videos in the file manager.</summary>
+    [RelayCommand]
+    private void OpenCaptures()
+    {
+        var folder = IsRecording || Directory.Exists(MoonCam.Infrastructure.Streaming.StreamController.VideosFolder)
+                     && !Directory.Exists(MoonCam.Infrastructure.Streaming.StreamController.PhotosFolder)
+            ? MoonCam.Infrastructure.Streaming.StreamController.VideosFolder
+            : MoonCam.Infrastructure.Streaming.StreamController.PhotosFolder;
+        Directory.CreateDirectory(folder);
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("xdg-open") { ArgumentList = { folder } })?.Dispose();
+        }
+        catch (System.ComponentModel.Win32Exception)
+        {
+            Notice = $"Your photos and videos are in {folder}";
+        }
+    }
+
     private void UpdateStats()
     {
+        if (_controller.RecordingStarted is { } started)
+        {
+            var elapsed = DateTimeOffset.Now - started;
+            RecordingTime = elapsed.TotalHours >= 1 ? elapsed.ToString(@"h\:mm\:ss") : elapsed.ToString(@"m\:ss");
+        }
         if (IsPairingOpen)
             ShowPairing(); // keeps the countdown moving and closes the card when the window expires
         if (!IsLive)
