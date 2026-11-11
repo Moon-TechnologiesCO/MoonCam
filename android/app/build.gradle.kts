@@ -11,8 +11,8 @@ android {
         applicationId = "io.github.moontechnologiesco.mooncam"
         minSdk = 29 // Android 10: Opus encoder, microphone direction hints, modern camera APIs
         targetSdk = 37
-        versionCode = 3
-        versionName = "0.3.0"
+        versionCode = 4
+        versionName = "0.4.0"
     }
 
     buildTypes {
