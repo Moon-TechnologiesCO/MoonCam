@@ -11,9 +11,11 @@ using MoonCam.Infrastructure.Streaming;
 
 namespace MoonCam.App.ViewModels;
 
-public sealed record CameraOption(string Id, string Label);
+public sealed record CameraOption(string Id, string Label, bool HasFlash = false, bool ManualFocus = false);
 
 public sealed record PresetOption(string Label, int Width, int Height, int Fps);
+
+public sealed record ShapeOption(MoonCam.Core.Media.FrameShape Shape, string Label);
 
 public sealed record PairedPhoneOption(string Name, string FingerprintHex, string Detail);
 
@@ -44,7 +46,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
         Presets = [.. StreamSettings.Presets.Select(p => new PresetOption(p.Name, p.Width, p.Height, p.Fps))];
         _selectedPreset = Presets.First(p => p.Width == 1280 && p.Fps == 30);
-        Cameras.Add(new CameraOption("0", "Back camera"));
+        Cameras.Add(new CameraOption("0", "Back camera", HasFlash: true, ManualFocus: true));
         _selectedCamera = Cameras[0];
 
         _controller.StateChanged += state => _runOnUi(() => ShowState(state));
@@ -104,6 +106,11 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private bool _isVirtualCameraOn;
     [ObservableProperty] private string _microphoneStatus = "";
     [ObservableProperty] private bool _isNoiseReductionOn = true;
+    [ObservableProperty] private bool _isTorchOn;
+    [ObservableProperty] private double _brightness;
+    [ObservableProperty] private bool _isAutoFocus = true;
+    [ObservableProperty] private ShapeOption _selectedShape = Shapes[0];
+    [ObservableProperty] private double _focusDistance = 30;
     [ObservableProperty] private string _virtualCameraStatus = "";
     [ObservableProperty] private bool _isSetupComplete = true;
     [ObservableProperty] private bool _isInstalling;
@@ -260,13 +267,68 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         }
     }
 
-    partial void OnSelectedCameraChanged(CameraOption? value) => ApplySettings();
+    partial void OnSelectedCameraChanged(CameraOption? value)
+    {
+        OnPropertyChanged(nameof(IsTorchAvailable));
+        OnPropertyChanged(nameof(TorchHint));
+        OnPropertyChanged(nameof(IsManualFocusAvailable));
+        ApplySettings();
+    }
 
     partial void OnSelectedPresetChanged(PresetOption value) => ApplySettings();
 
     partial void OnSelectedQualityChanged(int value) => ApplySettings();
 
     partial void OnIsNoiseReductionOnChanged(bool value) => _ = SetNoiseReductionAsync(value);
+
+    /// <summary>True when the chosen camera has a flash the computer can turn on.</summary>
+    public bool IsTorchAvailable => SelectedCamera?.HasFlash == true;
+
+    public string TorchHint => IsTorchAvailable
+        ? "Lights you up with the phone's flash."
+        : "This camera has no flash. The back camera usually has one.";
+
+    partial void OnIsTorchOnChanged(bool value) => _ = AdjustAsync();
+
+    partial void OnBrightnessChanged(double value) => _ = AdjustAsync();
+
+    partial void OnIsAutoFocusChanged(bool value) => _ = AdjustAsync();
+
+    partial void OnFocusDistanceChanged(double value)
+    {
+        if (!IsAutoFocus)
+            _ = AdjustAsync();
+    }
+
+    public static IReadOnlyList<ShapeOption> Shapes { get; } =
+    [
+        new(MoonCam.Core.Media.FrameShape.Wide, "Wide · 16:9"),
+        new(MoonCam.Core.Media.FrameShape.RoundedWide, "Wide, rounded corners"),
+        new(MoonCam.Core.Media.FrameShape.Standard, "Classic · 4:3"),
+        new(MoonCam.Core.Media.FrameShape.Square, "Square · 1:1"),
+        new(MoonCam.Core.Media.FrameShape.RoundedSquare, "Square, rounded corners"),
+        new(MoonCam.Core.Media.FrameShape.Circle, "Circle"),
+        new(MoonCam.Core.Media.FrameShape.Vertical, "Vertical · 9:16"),
+        new(MoonCam.Core.Media.FrameShape.Cinema, "Cinema · 21:9"),
+    ];
+
+    partial void OnSelectedShapeChanged(ShapeOption value) => _controller.Shape = value.Shape;
+
+    /// <summary>True when the chosen lens can focus by hand.</summary>
+    public bool IsManualFocusAvailable => SelectedCamera?.ManualFocus == true;
+
+    private async Task AdjustAsync()
+    {
+        try
+        {
+            await _controller.AdjustAsync(IsTorchOn, (int)Math.Round(Brightness),
+                IsAutoFocus || !IsManualFocusAvailable ? null : (int)Math.Round(FocusDistance));
+        }
+        catch (Exception e) when (e is IOException or InvalidOperationException)
+        {
+            Notice = $"Could not reach the phone: {e.Message}";
+        }
+    }
 
     private async Task SetNoiseReductionAsync(bool on)
     {
@@ -412,7 +474,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             var label = Base(camera);
             if (counts[label] > 1)
                 label += camera.FocalLengthMm is { } mm ? string.Create(CultureInfo.InvariantCulture, $" · {mm:0.#} mm") : $" · #{camera.PhysicalId ?? camera.Id}";
-            return new CameraOption(camera.PhysicalId ?? camera.Id, label);
+            return new CameraOption(camera.PhysicalId ?? camera.Id, label, camera.HasFlash == true, camera.ManualFocus == true);
         }).ToList();
     }
 

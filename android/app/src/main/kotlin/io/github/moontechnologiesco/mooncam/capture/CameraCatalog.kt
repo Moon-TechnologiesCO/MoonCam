@@ -35,7 +35,8 @@ class CameraCatalog(context: Context) {
             else -> "back"
         }
         val mainFocal = focalLength(c)
-        val main = CameraInfo(id, facing, "wide", null, mainFocal, sizes(c), frameRates(c))
+        val hasFlash = c.get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true
+        val main = CameraInfo(id, facing, "wide", null, mainFocal, sizes(c), frameRates(c), hasFlash, manualFocus(c))
 
         val capabilities = c.get(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES) ?: intArrayOf()
         if (mainFocal == null || CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_LOGICAL_MULTI_CAMERA !in capabilities) {
@@ -49,10 +50,14 @@ class CameraCatalog(context: Context) {
                 focal > mainFocal * 1.6 -> "telephoto"
                 else -> return@mapNotNull null
             }
-            CameraInfo(id, facing, lens, physicalId, focal, sizes(pc).ifEmpty { sizes(c) }, frameRates(pc).ifEmpty { frameRates(c) })
+            CameraInfo(id, facing, lens, physicalId, focal, sizes(pc).ifEmpty { sizes(c) }, frameRates(pc).ifEmpty { frameRates(c) }, hasFlash, manualFocus(pc))
         }
         return listOf(main) + lenses.distinctBy { it.lens }
     }
+
+    /** A lens can focus by hand when it reports a minimum focus distance (fixed-focus lenses report 0). */
+    private fun manualFocus(c: CameraCharacteristics): Boolean =
+        (c.get(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE) ?: 0f) > 0f
 
     private fun focalLength(c: CameraCharacteristics): Double? =
         c.get(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)?.minOrNull()?.toDouble()

@@ -46,7 +46,7 @@ and open it. The app is not in Google Play yet, so Android asks you to allow ins
 **Connect** — for USB, turn on *USB debugging* in the phone's developer options, plug in the cable and press
 **Connect via USB**. For Wi-Fi, press **Pair** on the computer and confirm the six-digit code on the phone.
 
-## What works today (v0.4)
+## What works today (v0.5)
 
 | Feature | Status |
 |---|---|
@@ -55,6 +55,9 @@ and open it. The app is not in Google Play yet, so Android asks you to allow ins
 | Virtual camera "MoonCam" (v4l2loopback, works with Secure Boot, no reboot) | ✅ |
 | Phone microphone as "MoonCam Microphone", with a **Noise cancellation** switch on the computer | ✅ new in 0.4 |
 | Front, back, ultra-wide and telephoto lenses; 480p–1080p, 30/60 fps, quality presets | ✅ |
+| Phone flashlight, brightness and autofocus or manual focus, from the computer | ✅ new in 0.5 |
+| Picture shapes: 16:9, 4:3, square, circle, vertical 9:16, cinema 21:9, rounded corners | ✅ new in 0.5 |
+| Background blur and backgrounds (built-in or your own) | 🚧 next |
 | Camera rests while nobody watches and wakes in about a second | ✅ |
 | Automatic reconnection, late frames dropped instead of growing delay | ✅ |
 | PC microphones and the virtual camera detected without restarting | ✅ |
@@ -103,7 +106,7 @@ cd desktop && dotnet test MoonCam.slnx
 cd android && ./gradlew :protocol:test :app:assembleDebug
 
 # Debian package
-packaging/linux/build-deb.sh 0.4.0
+packaging/linux/build-deb.sh 0.5.0
 ```
 
 No phone at hand? `FakePhone` streams a test pattern exactly like the app does:

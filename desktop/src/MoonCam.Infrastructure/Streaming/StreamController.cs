@@ -90,6 +90,47 @@ public sealed class StreamController : IAsyncDisposable
     public StreamSettings Settings => _settings;
 
     private volatile bool _noiseReduction = true;
+    private volatile bool _torch;
+    private volatile int _brightness;
+
+    /// <summary>The phone's flashlight, as last asked for. Off for every new connection.</summary>
+    public bool Torch => _torch;
+
+    /// <summary>Exposure from -100 (darker) to 100 (brighter); 0 lets the camera decide.</summary>
+    public int Brightness => _brightness;
+
+    private volatile int _focus = -1; // -1 = autofocus
+    private FrameShape _shape = FrameShape.Wide;
+
+    /// <summary>The shape apps and the preview receive: 16:9, 4:3, square, circle or vertical.</summary>
+    public FrameShape Shape
+    {
+        get => _shape;
+        set
+        {
+            _shape = value;
+            if (_pipeline is { } pipeline)
+                pipeline.Shape = value;
+            _log.Info($"Shape: {value}");
+        }
+    }
+
+    /// <summary>Manual focus from 0 (far) to 100 (closest), or null for autofocus.</summary>
+    public int? Focus => _focus < 0 ? null : _focus;
+
+    /// <summary>Flashlight, exposure and focus, applied by the phone without restarting the camera.</summary>
+    public async Task AdjustAsync(bool torch, int brightness, int? focus = null)
+    {
+        _torch = torch;
+        _brightness = Math.Clamp(brightness, -100, 100);
+        _focus = focus is { } f ? Math.Clamp(f, 0, 100) : -1;
+        _log.Info($"Adjust: flashlight {(torch ? "on" : "off")}, brightness {_brightness}, focus {(Focus?.ToString() ?? "auto")}");
+        if (_session?.Handler is Handler { MediaAllowed: true })
+            await SendAsync(AdjustCommand()).ConfigureAwait(false);
+    }
+
+    private ControlMessage AdjustCommand() => new(ControlOps.Adjust, Torch: _torch, Brightness: _brightness,
+        Focus: Focus, AutoFocus: Focus is null);
 
     /// <summary>Whether the phone's microphone is noise-reduced before apps hear it. On by default.</summary>
     public bool NoiseReduction => _noiseReduction;
@@ -184,6 +225,8 @@ public sealed class StreamController : IAsyncDisposable
             return;
         _log.Info("Someone is watching: starting the phone's camera");
         _ = SendAsync(command);
+        if (_torch || _brightness != 0 || Focus is not null)
+            _ = SendAsync(AdjustCommand()); // the phone keeps adjustments for the session; this covers a new one
         VideoDemandChanged?.Invoke();
     }
 
@@ -237,7 +280,7 @@ public sealed class StreamController : IAsyncDisposable
     /// <summary>Starts listening: 127.0.0.1 for the USB tunnel and, if configured, the LAN for Wi-Fi.</summary>
     public void Start()
     {
-        _pipeline = new VideoPipeline(_decoderFactory());
+        _pipeline = new VideoPipeline(_decoderFactory()) { Shape = _shape };
         _pipeline.KeyFrameNeeded += () => _ = SendAsync(new ControlMessage(ControlOps.KeyFrame));
         _pipeline.DecodeFailed += e => ReportProblem("Video decoding problem", e);
         _pipeline.SinkFailed += (sink, e) => ReportProblem(

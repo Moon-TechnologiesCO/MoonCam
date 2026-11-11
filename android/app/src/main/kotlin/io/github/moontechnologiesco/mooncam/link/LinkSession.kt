@@ -262,6 +262,7 @@ class LinkSession(private val context: Context, target: LinkTarget) {
                 StreamingStatus.update(StreamingState.Connected(computer))
             }
             ControlOps.KEY_FRAME -> streamer.requestKeyFrame()
+            ControlOps.ADJUST -> streamer.adjust(message.torch, message.brightness, message.focus, message.autoFocus)
         }
     }
 

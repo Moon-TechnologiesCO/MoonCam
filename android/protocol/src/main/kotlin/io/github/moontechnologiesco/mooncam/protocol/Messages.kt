@@ -43,6 +43,10 @@ data class CameraInfo(
     val focalLengthMm: Double? = null,
     val sizes: List<VideoSize>,
     val frameRates: List<Int>,
+    /** True when this camera has a flash that can light the scene (`adjust` with `torch`). */
+    val hasFlash: Boolean? = null,
+    /** True when the lens can focus by hand (`adjust` with `focus`). */
+    val manualFocus: Boolean? = null,
 )
 
 @Serializable
@@ -52,6 +56,9 @@ object ControlOps {
     const val START = "start"
     const val STOP = "stop"
     const val KEY_FRAME = "keyFrame"
+
+    /** Desktop → phone: light and image adjustments (`torch`, `brightness`) that apply without restarting. */
+    const val ADJUST = "adjust"
     const val STATUS = "status"
     const val PAIR_COMMIT = "pairCommit"
     const val PAIR_NONCE = "pairNonce"
@@ -76,6 +83,14 @@ data class ControlMessage(
     val streaming: Boolean? = null,
     val message: String? = null,
     val data: String? = null,
+    /** `adjust`: the phone's flashlight on or off (cameras with a flash only). */
+    val torch: Boolean? = null,
+    /** `adjust`: exposure from -100 (darker) to 100 (brighter); 0 is the camera's automatic exposure. */
+    val brightness: Int? = null,
+    /** `adjust`: focus distance from 0 (far) to 100 (as close as the lens can); null or absent = autofocus. */
+    val focus: Int? = null,
+    /** `adjust`: true to go back to continuous autofocus. */
+    val autoFocus: Boolean? = null,
 )
 
 /** Builds and reads the JSON-carrying frames. */
