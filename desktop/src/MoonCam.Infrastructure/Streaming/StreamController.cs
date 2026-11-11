@@ -390,6 +390,75 @@ public sealed class StreamController : IAsyncDisposable
         _pipeline?.AddSink(sink);
     }
 
+    public void RemoveSink(IVideoSink sink)
+    {
+        lock (_lock)
+            _sinks.Remove(sink);
+        _pipeline?.RemoveSink(sink);
+    }
+
+    // ===== Photos and recordings =====
+
+    private readonly MoonCam.Infrastructure.Capture.PhotoTaker _photos = new();
+    private int _photosAttached;
+    private MoonCam.Infrastructure.Capture.Recorder? _recorder;
+
+    /// <summary>Where photos and videos are saved: ~/Pictures/MoonCam and ~/Videos/MoonCam.</summary>
+    public static string PhotosFolder => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "MoonCam");
+    public static string VideosFolder => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), "MoonCam");
+
+    public bool IsRecording => _recorder is not null;
+    public DateTimeOffset? RecordingStarted => _recorder?.Started;
+
+    private async Task<VideoFrame> NextPictureAsync()
+    {
+        if (Interlocked.Exchange(ref _photosAttached, 1) == 0)
+            AddSink(_photos);
+        var next = _photos.NextFrameAsync();
+        var done = await Task.WhenAny(next, Task.Delay(TimeSpan.FromSeconds(3))).ConfigureAwait(false);
+        if (done != next)
+            throw new InvalidOperationException("No picture yet: connect the phone and wait until the preview shows video.");
+        return await next.ConfigureAwait(false);
+    }
+
+    /// <summary>Saves what apps see right now as a JPEG and returns its path.</summary>
+    public async Task<string> TakePhotoAsync()
+    {
+        var frame = await NextPictureAsync().ConfigureAwait(false);
+        var path = Path.Combine(PhotosFolder, $"MoonCam {DateTime.Now:yyyy-MM-dd HH.mm.ss}.jpg");
+        await MoonCam.Infrastructure.Capture.PhotoTaker.SaveJpegAsync(frame, path).ConfigureAwait(false);
+        _log.Info($"Photo saved: {path}");
+        return path;
+    }
+
+    /// <summary>Starts recording what apps see, with the phone's microphone when it is streaming.</summary>
+    public async Task<string> StartRecordingAsync()
+    {
+        if (_recorder is not null)
+            return _recorder.Path;
+        var frame = await NextPictureAsync().ConfigureAwait(false);
+        var path = Path.Combine(VideosFolder, $"MoonCam {DateTime.Now:yyyy-MM-dd HH.mm.ss}.mp4");
+        var audio = _microphone is not null ? VirtualMicrophone.SourceName : null;
+        var recorder = MoonCam.Infrastructure.Capture.Recorder.Start(frame.Width & ~1, frame.Height & ~1, audio, path);
+        _recorder = recorder;
+        AddSink(recorder);
+        _log.Info($"Recording {frame.Width}x{frame.Height}{(audio is null ? " without sound" : " with the phone's microphone")}: {path}");
+        return path;
+    }
+
+    /// <summary>Stops the recording and returns the saved file's path, or null when nothing was recording.</summary>
+    public async Task<string?> StopRecordingAsync()
+    {
+        var recorder = Interlocked.Exchange(ref _recorder, null);
+        if (recorder is null)
+            return null;
+        RemoveSink(recorder);
+        var path = await recorder.StopAsync().ConfigureAwait(false);
+        _log.Info($"Recording saved: {path} ({recorder.Frames} frames, {recorder.Dropped} dropped)");
+        await recorder.DisposeAsync().ConfigureAwait(false);
+        return path;
+    }
+
     /// <summary>Finds the first authorised phone on USB, opens the tunnel and launches MoonCam on it.</summary>
     public async Task<string> ConnectUsbAsync(CancellationToken cancellationToken = default)
     {
